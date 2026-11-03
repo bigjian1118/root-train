@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 综合干预建议 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/intervention.css">
+</head>
+<body>
+  <div class="page">
+    <!-- 顶部导航：左返回 + 页面标题；右侧用户信息为 auth.js 全站悬浮徽章 -->
+    <div class="head-nav">
+      <a class="back" href="/test/report" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回报告详情</a>
+      <span class="nav-title">AI 综合干预建议</span>
+    </div>
+
+    <h1 class="iv-h1">🤖 AI 综合干预建议</h1>
+    <p class="iv-meta" id="ivMeta"></p>
+
+    <!-- 生成中 / 失败状态 -->
+    <div class="glass iv-state" id="ivLoading">正在结合该生最新文本测评与视频情绪报告生成干预建议，请稍候…</div>
+    <div class="glass iv-state iv-error" id="ivError" hidden>
+      <p id="ivErrorText"></p>
+      <button class="btn btn-ghost" id="ivRetry" type="button">重新生成</button>
+    </div>
+
+    <!-- 主体内容：两个核心模块，无弹窗容器，超出一屏整页滚动 -->
+    <div id="ivContent" hidden>
+      <!-- 模块一：简要状态分析 -->
+      <section class="glass iv-card">
+        <h2><span class="txt-hl">一、简要状态分析</span></h2>
+        <div class="iv-status" id="ivStatus"></div>
+      </section>
+
+      <!-- 模块二：具体干预方案（页面核心主体） -->
+      <section class="glass iv-card iv-plan-card">
+        <h2><span class="txt-hl">二、具体干预方案</span></h2>
+        <div class="iv-plan" id="ivPlan"></div>
+      </section>
+    </div>
+
+    <!-- 底部统一免责声明 -->
+    <p class="iv-disclaimer">⚠️ 本页内容由 AI 辅助生成，仅供教师沟通指导参考，不能替代专业心理诊断与治疗。如有持续困扰，建议寻求专业心理咨询师帮助。</p>
+  </div>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/md_render.js"></script>
+  <script src="/static/js/intervention.js"></script>
+</body>
+</html>

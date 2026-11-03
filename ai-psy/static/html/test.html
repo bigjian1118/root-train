@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>场景化心理测评 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/test.css">
+</head>
+<body>
+  <div class="page">
+    <!-- 第一步：选择场景 -->
+    <section class="pick-panel" id="pickPanel">
+      <div class="head-nav">
+        <a class="back" href="/" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回上一页</a>
+        <a class="back-link" href="/">返回首页</a>
+      </div>
+      <h1>📋 SCL-90 场景化心理测评</h1>
+      <p class="sub">90 道生活化情境题 · 最近一周感受 · 预计 10-15 分钟<br>请选择最贴近你的身份场景：</p>
+      <div class="pick-list" id="pickList">
+        <!-- 场景卡片由 JS 从 /api/config 渲染 -->
+      </div>
+    </section>
+
+    <!-- 第二步：逐题作答 -->
+    <section class="quiz-panel" id="quizPanel" hidden>
+      <header class="quiz-head">
+        <span class="quiz-scene" id="quizScene"></span>
+        <span class="quiz-prog" id="quizProg">第 1/90 题</span>
+      </header>
+      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+
+      <div class="q-card">
+        <div class="q-factor" id="qFactor"></div>
+        <div class="q-text" id="qText">题目加载中…</div>
+        <div class="opt-list" id="optList"></div>
+        <div class="q-nav">
+          <button class="btn btn-prev" id="prevBtn">← 上一题</button>
+          <button class="btn btn-submit" id="submitBtn" hidden>提交答卷并生成报告</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 提交成功后跳转独立报告页 /test/report -->
+  </div>
+
+  <div class="loading-mask" id="loadingMask" hidden>
+    <div class="spinner"></div>
+    <p>AI 正在生成你的解读报告，请稍候…</p>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/scl90_data.js"></script>
+  <script src="/static/js/test.js"></script>
+</body>
+</html>

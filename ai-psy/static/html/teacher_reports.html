@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班级测评报告 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/teacher_reports.css">
+</head>
+<body>
+  <div class="page">
+    <div class="head-nav">
+      <a class="back" href="/" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回上一页</a>
+      <a class="back-link" href="/">返回首页</a>
+    </div>
+    <h1>📋 本班级同学心理测试报告</h1>
+    <p class="sub" id="classLabel">班级加载中…</p>
+
+    <div class="toolbar glass">
+      <label class="day-filter">统计天数：
+        <select id="daySelect">
+          <option value="7" selected>近 7 天</option>
+          <option value="14">近 14 天</option>
+          <option value="30">近 30 天</option>
+          <option value="0">全部</option>
+        </select>
+      </label>
+      <label class="day-filter">起
+        <input type="date" id="dateFrom">
+      </label>
+      <label class="day-filter">止
+        <input type="date" id="dateTo">
+      </label>
+      <label class="day-filter">班级：
+        <select id="classSelect">
+          <option>班级加载中…</option>
+        </select>
+      </label>
+      <input id="searchBox" placeholder="搜索学生姓名 / 场景…">
+      <span class="count" id="countLabel"></span>
+    </div>
+
+    <!-- 筛选联动统计卡片（数据大屏：关键数字黄色高亮） -->
+    <div class="stat-cards">
+      <div class="stat-card glass">
+        <div class="num hl-num" id="statStudents">0</div>
+        <div class="lbl"><span class="txt-hl">总人数</span></div>
+      </div>
+      <div class="stat-card glass">
+        <div class="num hl-num" id="statTodayStudents">0</div>
+        <div class="lbl"><span class="txt-hl">今日检测人数</span></div>
+      </div>
+      <div class="stat-card glass">
+        <div class="num hl-num" id="statReports">0</div>
+        <div class="lbl"><span class="txt-hl">总检测次数</span></div>
+      </div>
+      <div class="stat-card glass">
+        <div class="num hl-num" id="statTodayReports">0</div>
+        <div class="lbl"><span class="txt-hl">今日检测次数</span></div>
+      </div>
+      <div class="stat-card glass focus">
+        <div class="num hl-num" id="statFocus">0</div>
+        <div class="lbl"><span class="txt-hl">重点关注人数（危机或总分&gt;300）</span></div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <!-- 表头（固定在顶部，不参与滚动） -->
+      <table id="reportTable" class="table-head">
+        <thead>
+          <tr>
+            <th>学生姓名</th><th>测评场景</th><th>总分</th><th>阳性项目数</th>
+            <th>危机信号</th><th>状态</th><th>提交时间</th><th>操作</th>
+          </tr>
+        </thead>
+      </table>
+      <!-- 滚动容器（只包 tbody，滚动条从表头下方开始） -->
+      <div class="scroll-list">
+        <table class="table-body">
+          <tbody id="reportTbody"></tbody>
+        </table>
+      </div>
+      <p class="empty-tip" id="emptyTip" hidden>所选时间范围内暂无学生提交测评报告。</p>
+    </div>
+
+    <!-- 因子偏向柱状图 -->
+    <div class="chart-wrap">
+      <div class="legend">
+        <span><i class="lg-green"></i>正常（均分&lt;2）</span>
+        <span><i class="lg-gold"></i>需关注（2~3）</span>
+        <span><i class="lg-orange"></i>重点（≥3）</span>
+      </div>
+      <h2 id="chartTitle">近一周内偏向各个因子的人数</h2>
+      <div class="chart" id="factorChart"></div>
+      <p class="chart-tip">偏向标准：该因子均分 ≥ 2 分；柱子颜色按该因子班级均分严重程度着色</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/teacher_reports.js"></script>
+</body>
+</html>

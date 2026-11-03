@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 心晴 AI 心理空间</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+  <div class="login-bg">
+    <div class="bg-glow glow-a"></div>
+    <div class="bg-glow glow-b"></div>
+  </div>
+  <main class="login-wrap">
+    <div class="login-brand">
+      <h1>心晴<span>·</span>AI 心理空间</h1>
+      <p>看见每一种情绪，陪伴每一段成长</p>
+    </div>
+
+    <section class="login-card">
+      <div class="auth-tabs">
+        <button type="button" data-tab="login" class="active">登 录</button>
+        <button type="button" data-tab="register">注 册</button>
+      </div>
+
+      <div class="role-pick" id="rolePick">
+        <label class="checked"><input type="radio" name="auth-role" value="student" checked>🎓 学生端</label>
+        <label><input type="radio" name="auth-role" value="teacher">👩‍🏫 教师端</label>
+      </div>
+
+      <form class="auth-form" id="authForm" autocomplete="off">
+        <div class="field" id="fieldNo">
+          <label for="inpNo">学号</label>
+          <input id="inpNo" name="no" placeholder="请输入学号">
+        </div>
+        <div class="field" id="fieldName">
+          <label for="inpName">姓名</label>
+          <input id="inpName" name="name" placeholder="请输入姓名">
+        </div>
+        <div class="field" id="fieldClass">
+          <label for="inpClass">班级</label>
+          <div class="class-input-wrap" id="classInputWrap">
+            <input id="inpClass" name="class" placeholder="请输入班级">
+          </div>
+          <button type="button" class="class-add-btn" id="addClassBtn" hidden>＋ 新增班级</button>
+          <div class="class-hint" id="classHint" hidden>
+            班级名不能包含逗号、顿号等分隔符
+          </div>
+        </div>
+        <div class="field">
+          <label for="inpAccount">账号</label>
+          <input id="inpAccount" name="account" placeholder="自定义登录账号（至少 3 个字符）">
+        </div>
+        <div class="field">
+          <label for="inpPassword">密码</label>
+          <input id="inpPassword" name="password" type="password" placeholder="至少 6 位">
+        </div>
+        <div class="auth-error" id="authError"></div>
+        <button type="submit" class="auth-submit" id="authSubmit">登 录</button>
+      </form>
+
+      <p class="auth-hint" id="authHint">还没有账号？<a id="toRegister">立即注册</a></p>
+    </section>
+
+    <footer class="login-footer">⚠️ 本平台 AI 分析仅供参考，不能替代专业心理诊断与治疗。</footer>
+  </main>
+
+  <script src="/static/js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>心理测评选择 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/test_select.css">
+</head>
+<body>
+  <div class="page">
+    <section class="pick-panel">
+      <div class="head-nav">
+        <a class="back" href="/" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回上一页</a>
+        <a class="back-link" href="/">返回首页</a>
+      </div>
+      <h1>心理测评选择</h1>
+      <p class="sub">请根据自身情况选择量表进行测评，测评结果仅作为心理健康筛查参考。</p>
+
+      <div class="scale-list">
+        <!-- 量表卡片：SCL-90 -->
+        <a class="scale-card" href="/test/scl90">
+          <div class="scale-emoji">📋</div>
+          <div class="scale-body">
+            <h3>SCL-90症状自评量表</h3>
+            <div class="scale-meta">
+              <span class="chip chip-green">适用人群：高中生及大学生</span>
+              <span class="chip chip-gold">共 90 题</span>
+            </div>
+            <p>适用于高中生及大学生，共90题，深度心理健康筛查。</p>
+          </div>
+          <span class="scale-btn">点击进入 →</span>
+        </a>
+      </div>
+    </section>
+  </div>
+  <script src="/static/js/auth.js"></script>
+</body>
+</html>

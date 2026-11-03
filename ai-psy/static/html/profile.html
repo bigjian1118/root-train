@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人中心 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/profile.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- 左侧边栏：个人信息 + 对应功能入口 -->
+    <aside class="sidebar">
+      <a class="brand" href="/">🌿 心晴 · 个人中心</a>
+      <nav id="sideNav">
+        <button class="nav-item active" data-view="info">👤 个人信息</button>
+        <button class="nav-item student-feature" data-href="/chat">💬 AI 聊天助手</button>
+        <button class="nav-item student-feature" data-href="/face">📷 人脸视频分析</button>
+        <button class="nav-item student-feature" data-href="/test">📋 场景化心理测评</button>
+        <button class="nav-item student-feature" data-href="/appointment">🗓️ 心理咨询预约</button>
+        <button class="nav-item student-feature" data-href="/articles">📖 心理科普文章</button>
+        <!-- 学生专属：我的报告（文本 + 视频合并页） -->
+        <button class="nav-item nav-student" data-href="/student/reports" hidden>🗂️ 我的心理测试报告</button>
+        <!-- 教师专属：班级报告管理 -->
+        <button class="nav-item nav-teacher" data-href="/teacher/reports" hidden>🗂️ 班级测评报告</button>
+        <!-- 教师专属：预约管理（班级测评报告下方、师生倾诉上方） -->
+        <button class="nav-item nav-teacher" data-href="/teacher/appointment" hidden>🗓️ 预约管理</button>
+        <button class="nav-item nav-teacher" data-href="/teacher/materials" hidden>📚 心理活动素材库</button>
+        <button class="nav-item nav-teacher" data-href="/teacher/articles" hidden>📰 心理推文</button>
+        <!-- 师生倾诉入口（角色自适应 + 未读红点） -->
+        <button class="nav-item nav-item-msg" data-msg-entry data-href-student="/msg" data-href-teacher="/teacher/msg" hidden>💌 师生倾诉<span class="msg-badge" data-badge hidden></span></button>
+        <button class="nav-item nav-logout" id="logoutBtn">🚪 退出登录</button>
+      </nav>
+    </aside>
+
+    <!-- 右侧主区：个人信息页（除 id 外的全部信息） -->
+    <main class="main">
+      <h1>个人信息</h1>
+      <p class="sub">以下展示你注册时填写的全部信息（内部编号 id 不对外显示）。</p>
+      <div class="info-card">
+        <div class="fields" id="infoFields">
+          <p class="loading-tip">加载中…</p>
+        </div>
+        <button class="btn-edit" id="editBtn" type="button">✏️ 编辑</button>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/profile.js"></script>
+  <script src="/static/js/msg_entries.js"></script>
+</body>
+</html>

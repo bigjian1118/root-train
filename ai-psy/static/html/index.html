@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>心晴 · AI 心理测试分析平台</title>
+  <link rel="stylesheet" href="/static/css/index.css">
+</head>
+<body>
+  <div class="hero">
+    <div class="hero-glow glow-a"></div>
+    <div class="hero-glow glow-b"></div>
+    <header class="topbar">
+      <div class="logo">心晴<span>·</span>AI 心理空间</div>
+      <nav class="nav">
+        <a class="student-feature" href="/chat">聊天助手</a>
+        <a class="student-feature" href="/face">视频分析</a>
+        <a class="student-feature" href="/test">心理测评</a>
+        <a class="student-feature" href="/appointment">预约咨询</a>
+        <a class="student-feature" href="/articles">心理科普</a>
+        <a class="teacher-feature" href="/teacher/materials">素材库</a>
+        <a class="msg-entry" data-msg-entry data-href-student="/msg" data-href-teacher="/teacher/msg" hidden>师生倾诉<span class="msg-badge" data-badge hidden></span></a>
+        <span id="navUser"></span>   <!-- ← 身份/个人中心/退出：auth.js 注入到这里 -->
+      </nav>
+    </header>
+
+    <main class="hero-main">
+      <h1 class="title">看见每一种情绪<br><em>陪伴每一段成长</em></h1>
+      <p class="subtitle">基于微调大模型 · SCL-90 场景化测评 · 面部情绪分析</p>
+
+      <!-- ========== 心理科普文章（列表 + 详情，直接在首页展示） ========== -->
+      <div class="article-wrap">
+
+        <!-- 列表视图 -->
+        <div id="listView">
+          <div class="arc-header">
+            <h2>📖 心理科普文章</h2>
+            <p class="arc-sub">科学 · 正向 · 治愈 · 落地，陪你在成长路上照顾好自己</p>
+          </div>
+          <!-- 搜索框 -->
+          <div class="arc-search">
+            <input type="text" id="arcSearch" placeholder="🔍 搜索文章标题（如「开学」「考试」「挫折」…）" autocomplete="off">
+            <button type="button" id="arcSearchClear" title="清空">✕</button>
+          </div>
+          <div id="articleList" class="article-list">
+            <div class="loading">加载中…</div>
+          </div>
+          <!-- 分页控件 -->
+          <div class="pager" id="pager" hidden>
+            <button class="page-btn" id="prevPage" hidden>上一页</button>
+            <span class="page-info" id="pageInfo"></span>
+            <button class="page-btn" id="nextPage">下一页</button>
+          </div>
+        </div>
+
+        <!-- 详情视图 -->
+        <div id="detailView" hidden>
+          <button class="back" id="backBtn">← 返回列表</button>
+          <div id="detailBody" class="detail-body"></div>
+        </div>
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      ⚠️ 本平台 AI 分析仅供参考，不能替代专业心理诊断与治疗。
+      如需帮助请拨打心理援助热线 400-161-9995。
+    </footer>
+  </div>
+
+  <!-- 悬浮回到顶部 -->
+  <button class="back-top" id="backTopBtn" type="button" aria-label="回到顶部">
+    <span class="bt-arrow">▲</span>
+    <span class="bt-tip">回到顶部</span>
+  </button>
+
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/index.js"></script>
+  <script src="/static/js/msg_entries.js"></script>
+</body>
+</html>

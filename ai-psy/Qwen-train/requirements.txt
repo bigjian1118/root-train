@@ -1,0 +1,12 @@
+# QLoRA 微调环境依赖（建议单独 conda 环境或复用 qwen_env，Python 3.10-3.12）
+# 注意：transformers 必须锁 4.51.3 —— 复用 qwen_env 训练时若升到 4.52+，
+# 会破坏同环境内 vLLM 0.7.0 的导入（TypeError: argument of type '_ModuleGlob' is not iterable）
+torch>=2.4.0
+transformers==4.51.3
+peft>=0.12.0
+trl>=0.9.0
+datasets>=2.19.0
+bitsandbytes>=0.43.1
+accelerate>=0.33.0
+sentencepiece
+protobuf

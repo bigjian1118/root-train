@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>心理科普文章管理 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/teacher_articles.css">
+</head>
+<body>
+  <div class="page">
+    <!-- 顶部导航 -->
+    <div class="head-nav">
+      <a class="back" href="/" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回上一页</a>
+      <a class="back-link" href="/profile">返回个人中心</a>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1>📰 心理科普文章管理</h1>
+        <p class="sub">新增 / 编辑 / 删除心理科普文章，保存后学生端首页与文章页刷新即自动同步。</p>
+      </div>
+      <button type="button" class="btn btn-primary" id="createBtn">＋ 新建文章</button>
+    </div>
+
+    <!-- 文章列表 -->
+    <div class="art-table" id="artTable">
+      <div class="loading">加载中…</div>
+    </div>
+
+    <!-- 空状态 -->
+    <div class="empty-tip" id="emptyTip" hidden>暂无文章，点击右上角「新建文章」发布第一篇心理科普推文吧。</div>
+
+    <!-- 分页 -->
+    <div class="pager" id="pager" hidden>
+      <button class="page-btn" id="prevPage">← 上一页</button>
+      <span class="page-info" id="pageInfo"></span>
+      <button class="page-btn" id="nextPage">下一页 →</button>
+    </div>
+  </div>
+
+  <!-- 新建/编辑文章弹窗 -->
+  <div class="modal-mask" id="editModal" hidden>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <h3 id="editModalTitle">＋ 新建文章</h3>
+        <button type="button" class="modal-close" id="editClose">✕</button>
+      </div>
+      <form id="editForm">
+        <label class="field">
+          <span class="field-label">文章标题 <em>*</em></span>
+          <input type="text" id="artTitle" maxlength="60" placeholder="如：考前焦虑自救指南" required>
+        </label>
+        <label class="field">
+          <span class="field-label">文章来源（选填）</span>
+          <input type="text" id="artSource" maxlength="60" placeholder="如：校心理健康中心，留空则用系统默认来源">
+        </label>
+        <label class="field">
+          <span class="field-label">文章简介（选填）</span>
+          <textarea id="artSummary" rows="2" maxlength="120" placeholder="一句话简介，展示在学生端列表页…"></textarea>
+        </label>
+        <label class="field">
+          <span class="field-label">文章正文 <em>*</em></span>
+          <textarea id="artContent" rows="10" placeholder="支持换行的长文本，保存后学生端详情页按段落展示…" required></textarea>
+        </label>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="editCancel">取消</button>
+          <button type="submit" class="btn btn-primary" id="editSubmit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 删除二次确认弹窗 -->
+  <div class="modal-mask" id="confirmModal" hidden>
+    <div class="modal-panel modal-confirm">
+      <div class="modal-head">
+        <h3>⚠️ 删除确认</h3>
+        <button type="button" class="modal-close" id="confirmClose">✕</button>
+      </div>
+      <p class="confirm-text" id="confirmText">确定要删除这篇文章吗？删除后不可恢复。</p>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="confirmCancel">取消</button>
+        <button type="button" class="btn btn-danger" id="confirmOk">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/teacher_articles.js"></script>
+</body>
+</html>

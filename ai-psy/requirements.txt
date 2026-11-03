@@ -1,0 +1,6 @@
+# pyfeat_env 后端依赖（py-feat / CPU torch 已按 README.md 安装，此处仅补充 Web 层）
+flask>=3.0
+requests>=2.31
+# 随机森林（规则蒸馏）：文本因子严重程度分级 + 视频主导情绪分类（rf/ 子包）
+scikit-learn==1.5.2
+joblib>=1.3

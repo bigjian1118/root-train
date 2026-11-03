@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学生倾诉留言 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/msg_student.css">
+  <link rel="stylesheet" href="/static/css/teacher_msg.css">
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <span class="head-nav">
+        <a class="back" href="/" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回上一页</a>
+        <a class="back-link" href="/">返回首页</a>
+      </span>
+      <span class="head-note">🔒 仅你和这位学生可见，永久保存</span>
+    </div>
+    <h1>📥 学生倾诉留言</h1>
+    <p class="sub">学生向你发起的一对一倾诉，新留言高亮提醒，请及时回应疏导。</p>
+
+    <div class="conv-list" id="convList">
+      <p class="empty-tip" id="emptyTip" hidden>暂没有学生给你留言。</p>
+    </div>
+  </div>
+
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/teacher_msg_list.js"></script>
+</body>
+</html>

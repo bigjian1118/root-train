@@ -1,0 +1,32 @@
+/* ===== 教师端「学生倾诉」补充样式（基座继承 msg_student.css，适配治愈系视觉，仅外观）===== */
+:root {
+  --sky: #7ec8f2;
+  --sky-deep: #3a9bd8;
+  --gold: #f0dca0;
+  --gold-deep: #d9b45c;
+  --ink-soft: #5b7688;
+}
+
+.head-note { color: var(--ink-soft); font-size: 12px; }
+
+/* 学生班级标签 */
+.class-tag {
+  display: inline-block; background: rgba(126, 200, 242, 0.16); color: var(--sky-deep); font-size: 12px;
+  padding: 1px 8px; border-radius: 999px; margin-top: 2px;
+}
+
+/* 新留言高亮：未读行柔金底 + 左侧强调条 */
+.conv-item.has-new {
+  border-color: rgba(217, 180, 92, 0.6);
+  background: rgba(255, 249, 234, 0.85);
+  box-shadow: 0 8px 20px rgba(217, 180, 92, 0.18);
+}
+.conv-item.has-new:hover { background: rgba(255, 247, 217, 0.95); box-shadow: 0 16px 32px rgba(217, 180, 92, 0.26); }
+.conv-item.has-new .conv-name { color: #a06a11; }
+
+/* 新消息冒点指示 */
+.dot-new {
+  flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%;
+  background: #e0483e; align-self: center;
+  box-shadow: 0 2px 6px rgba(224, 72, 62, 0.45);
+}

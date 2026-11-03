@@ -1,0 +1,207 @@
+/* ===== 个人中心：AIC 2026 简约现代 AI 科技风格，仅外观 ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+:root {
+  --sky: #7ec8f2;
+  --sky-deep: #3a9bd8;
+  --gold: #f0dca0;
+  --gold-deep: #d9b45c;
+  --green: #b6e3c8;
+  --green-deep: #6fc297;
+  --ink: #2b4a5e;
+  --ink-soft: #5b7688;
+  --ink-pale: #6c8494;
+}
+
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  background: linear-gradient(160deg, #e4f4ff 0%, #eaf8f0 50%, #fbf6e8 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+.layout { display: flex; min-height: 100vh; }
+
+/* ---------- 左侧边栏（全屏：紧贴上下左边缘，高度占满视口） ---------- */
+.sidebar {
+  width: 232px; flex-shrink: 0;
+  margin: 0;
+  min-height: 100vh;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.90);
+  border-radius: 0;
+  box-shadow: 0 8px 24px rgba(58, 155, 216, 0.08);
+  padding: 22px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+  position: sticky; top: 0; align-self: flex-start;
+  transition: box-shadow 0.25s;
+}
+.sidebar:hover { box-shadow: 0 14px 36px rgba(58, 155, 216, 0.14); }
+
+.brand {
+  display: block; text-decoration: none; color: var(--sky-deep);
+  font-size: 17px; font-weight: 700; padding: 4px 10px 18px; margin-bottom: 8px;
+  border-bottom: 1px solid rgba(126, 200, 242, 0.20);
+}
+
+.nav-item {
+  display: block; width: 100%; text-align: left;
+  border: none; background: transparent; cursor: pointer;
+  font-size: 14.5px; color: var(--ink); font-family: inherit;
+  padding: 11px 14px; border-radius: 12px;
+  transition: transform 0.15s, background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.nav-item:hover {
+  background: rgba(126, 200, 242, 0.14);
+  transform: translateY(-1px);
+}
+.nav-item.active {
+  background: linear-gradient(135deg, var(--sky-deep), var(--green-deep));
+  color: #fff; font-weight: 600;
+  box-shadow: 0 4px 14px rgba(58, 155, 216, 0.22);
+}
+.nav-logout { margin-top: auto; color: #c24f45; }
+.nav-logout:hover { background: rgba(217, 83, 79, 0.08); }
+
+/* ---------- 右侧主区（全屏：自适应填充剩余空间，无最大宽度限制） ---------- */
+.main { flex: 1; min-width: 0; padding: 34px 44px 60px; max-width: none; }
+
+/* 返回按钮 */
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  text-decoration: none; color: var(--sky-deep); font-size: 14px;
+  padding: 7px 16px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(58, 155, 216, 0.06);
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+  margin-bottom: 20px;
+}
+.back:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(58, 155, 216, 0.14); background: #fff; }
+
+h1 {
+  font-size: 28px; margin-bottom: 6px; font-weight: 800; letter-spacing: 0.5px;
+  background: linear-gradient(90deg, var(--sky-deep), var(--green-deep), var(--gold-deep));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sub { font-size: 14px; color: var(--ink-soft); margin-bottom: 24px; }
+
+/* 信息卡 */
+.info-card {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.90);
+  border-radius: 22px;
+  padding: 30px 34px;
+  box-shadow: 0 8px 24px rgba(58, 155, 216, 0.08);
+  display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap;
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+.info-card:hover { box-shadow: 0 14px 36px rgba(58, 155, 216, 0.14); }
+
+.fields { flex: 1; min-width: 280px; }
+.loading-tip { color: var(--ink-pale); font-size: 14px; padding: 20px 0; }
+
+.field {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 4px; border-bottom: 1px solid rgba(126, 200, 242, 0.14); font-size: 15px;
+}
+.field:last-child { border-bottom: none; }
+.fk { width: 92px; color: var(--ink-soft); font-weight: 600; flex-shrink: 0; }
+.fv { color: var(--ink); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%);
+  background: rgba(43, 74, 94, 0.94); color: #fff; font-size: 13.5px;
+  padding: 10px 20px; border-radius: 999px; z-index: 950;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+/* ---------- 个人信息编辑：按钮 + 输入框 ---------- */
+.btn-edit {
+  margin-left: auto; align-self: flex-start;
+  border: 1px solid rgba(122, 200, 242, 0.40);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--sky-deep); font-size: 14px; font-family: inherit; font-weight: 600;
+  padding: 8px 18px; border-radius: 999px; cursor: pointer; flex-shrink: 0;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.btn-edit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(58, 155, 216, 0.12);
+  background: #fff;
+}
+
+.edit-input {
+  flex: 1; min-width: 0;
+  border: 1px solid rgba(122, 200, 242, 0.30);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink); font-size: 15px; font-family: inherit;
+  padding: 8px 12px; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.edit-input:focus {
+  border-color: var(--sky-deep);
+  box-shadow: 0 0 0 3px rgba(58, 155, 216, 0.12);
+}
+.edit-input::placeholder { color: var(--ink-pale); }
+
+.edit-actions {
+  display: flex; gap: 14px; margin-top: 20px;
+}
+.btn-save {
+  border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--sky-deep), var(--green-deep));
+  color: #fff; font-size: 14.5px; font-weight: 600; font-family: inherit;
+  padding: 10px 26px; border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(58, 155, 216, 0.18);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn-save:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(58, 155, 216, 0.26); }
+.btn-cancel {
+  border: 1px solid rgba(122, 200, 242, 0.30);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink-soft); font-size: 14.5px; font-family: inherit;
+  padding: 10px 26px; border-radius: 999px; cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.btn-cancel:hover { transform: translateY(-1px); background: #fff; }
+
+/* ---------- 教师端：多选班级 chips 组件 ---------- */
+.chips-container { flex: 1; min-width: 0; }
+.chips-wrap {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 6px; border-radius: 10px;
+  border: 1px solid rgba(122, 200, 242, 0.30);
+  background: rgba(255, 255, 255, 0.90);
+  min-height: 36px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.chips-wrap:focus-within {
+  border-color: var(--sky-deep);
+  box-shadow: 0 0 0 3px rgba(58, 155, 216, 0.12);
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: linear-gradient(135deg, rgba(230, 247, 236, 0.95), rgba(214, 240, 255, 0.95));
+  color: var(--ink); font-size: 13.5px; padding: 3px 8px 3px 10px;
+  border-radius: 999px; font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.80);
+}
+.chip-x {
+  color: var(--ink-soft); cursor: pointer; font-size: 16px; line-height: 1;
+  padding: 0 2px;
+}
+.chip-x:hover { color: #c24f45; }
+.chip-input {
+  flex: 1; min-width: 120px; border: none; outline: none; background: transparent;
+  color: var(--ink); font-size: 14px; font-family: inherit; padding: 2px 4px;
+}
+.chip-input::placeholder { color: var(--ink-pale); }

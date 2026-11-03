@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 聊天助手 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/chat.css">
+</head>
+<body>
+  <div class="chat-layout">
+    <!-- 左侧：场景切换栏 -->
+    <aside class="sidebar">
+      <div class="head-nav">
+        <a class="back" href="/" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回上一页</a>
+        <a class="back-link" href="/">返回首页</a>
+      </div>
+      <h1 class="brand">💬 心语助手</h1>
+      <p class="tip">选择你的身份场景，获得更贴合的陪伴</p>
+      <div class="scenario-list" id="scenarioList">
+        <!-- 场景按钮由 JS 从 /api/config 拉取渲染 -->
+      </div>
+      <button class="clear-btn" id="clearBtn">🗑 清空会话</button>
+      <div class="mock-badge" id="mockBadge" hidden>MOCK 演示模式</div>
+    </aside>
+
+    <!-- 右侧：聊天区 -->
+    <main class="chat-main">
+      <div class="chat-head" id="chatHead">当前场景：大学生</div>
+      <div class="msg-list" id="msgList">
+        <div class="msg bot">
+          <div class="avatar">🌤</div>
+          <div class="bubble">你好呀，我是心语助手。选择左侧的身份场景，就可以开始和我聊心事啦～</div>
+        </div>
+      </div>
+      <div class="input-bar">
+        <textarea id="userInput" rows="1" placeholder="输入你想说的话，Enter 发送"></textarea>
+        <button id="sendBtn">发送</button>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/md_render.js"></script>
+  <script src="/static/js/chat.js"></script>
+</body>
+</html>

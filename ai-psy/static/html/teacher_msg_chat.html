@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>倾诉对话 · 心晴</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/msg_chat.css">
+</head>
+<body>
+  <div class="chat-page">
+    <!-- 顶部：学生姓名 + 班级身份 -->
+    <header class="chat-head">
+      <span class="head-nav">
+        <a class="back" href="/" onclick="if(history.length&gt;1){history.back();return false;}return true;">← 返回上一页</a>
+        <a class="back-link" href="/">首页</a>
+      </span>
+      <div class="head-who">
+        <b id="whoName">学生</b>
+        <span id="whoTag">心理倾诉者</span>
+      </div>
+      <span class="privacy">🔒 一对一私密</span>
+    </header>
+
+    <!-- 消息区域：学生居左白、我（老师）居右绿，自动滚动到底部 -->
+    <div class="chat-body" id="chatBody">
+      <p class="load-tip" id="loadTip">正在加载留言…</p>
+    </div>
+
+    <!-- 回复区 -->
+    <footer class="chat-input">
+      <textarea id="inputBox" placeholder="用心回应、温柔疏导…" rows="1"></textarea>
+      <button type="button" id="sendBtn">回复</button>
+    </footer>
+  </div>
+
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/teacher_msg_chat.js"></script>
+</body>
+</html>

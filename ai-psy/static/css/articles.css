@@ -1,0 +1,180 @@
+/* ===== 学生端：心理科普文章（列表 + 详情，统一为首页治愈系视觉，仅外观）=====
+   延续首页治愈心理风：柔和渐变背景、大圆角、薄雾阴影、无硬边框。 */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --sky: #7ec8f2;
+  --sky-deep: #3a9bd8;
+  --gold: #f0dca0;
+  --gold-deep: #d9b45c;
+  --green: #b6e3c8;
+  --green-deep: #6fc297;
+  --ink: #2b4a5e;
+  --ink-soft: #5b7688;
+  --ink-pale: #6c8494;
+}
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--ink); min-height: 100vh;
+  background: linear-gradient(160deg, #d6f0ff 0%, #e6f7ec 55%, #fbf3dd 100%);
+  background-attachment: fixed;
+}
+/* 全屏布局：去除最大宽度与左右外边距，内容铺满视口 */
+.page { max-width: none; margin: 0; padding: 20px 24px 60px; }
+
+/* 返回/首页行 */
+.head-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  text-decoration: none; color: var(--sky-deep); font-size: 14px; font-family: inherit;
+  padding: 7px 16px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(58, 155, 216, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  width: max-content; cursor: pointer;
+}
+.back:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(58, 155, 216, 0.22); background: #fff; }
+.back-link {
+  color: var(--ink-soft); text-decoration: none; font-size: 13px;
+  padding: 7px 10px; border-radius: 999px; transition: color 0.2s, background 0.2s;
+}
+.back-link:hover { color: var(--sky-deep); background: rgba(126, 200, 242, 0.14); }
+
+h1 {
+  font-size: 30px; font-weight: 800; margin-bottom: 8px; letter-spacing: 0.5px;
+  background: linear-gradient(90deg, var(--sky-deep), var(--green-deep), var(--gold-deep));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sub { color: var(--ink-soft); font-size: 14px; margin-bottom: 26px; }
+
+/* 列表：每篇一卡 */
+.article-list { display: grid; gap: 14px; }
+.arc-card {
+  display: flex; gap: 16px; text-decoration: none; color: inherit;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 18px; padding: 16px;
+  box-shadow: 0 8px 20px rgba(58, 155, 216, 0.1);
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+.arc-card:hover { box-shadow: 0 18px 38px rgba(58, 155, 216, 0.2); transform: translateY(-3px); }
+.arc-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.arc-title { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.4; margin-bottom: 6px; }
+.arc-summary {
+  font-size: 13px; color: var(--ink-soft); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.arc-date { margin-top: auto; font-size: 12px; color: var(--ink-pale); }
+.arc-tags { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+.arc-tags em { font-style: normal; font-size: 11px; }
+.arc-src { color: #1f6fb0; background: rgba(30, 111, 176, 0.1); border-radius: 999px; padding: 2px 8px; }
+
+/* 分页 */
+.pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 26px; }
+.page-btn {
+  border: 1px solid rgba(122, 200, 242, 0.55); background: rgba(255, 255, 255, 0.72); color: var(--sky-deep);
+  border-radius: 999px; padding: 8px 20px; cursor: pointer; font-size: 14px; font-family: inherit;
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+}
+.page-btn:hover:not([hidden]) { background: #fff; box-shadow: 0 8px 18px rgba(58, 155, 216, 0.18); transform: translateY(-1px); }
+.page-btn[hidden] { display: none; }
+.page-info { font-size: 13px; color: var(--ink-soft); }
+
+/* 详情 */
+.source-tag {
+  display: inline-block; background: rgba(182, 227, 200, 0.4); color: #2f7d52;
+  border-radius: 999px; padding: 5px 14px; font-size: 13px; margin-bottom: 12px;
+}
+.detail-title {
+  font-size: 27px; line-height: 1.5; margin-bottom: 8px; font-weight: 800; color: var(--ink);
+  background: linear-gradient(90deg, var(--ink), var(--sky-deep));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.detail-date { color: var(--ink-pale); font-size: 13px; margin-bottom: 18px; }
+.detail-cover { width: 100%; height: 220px; border-radius: 16px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 10px 26px rgba(58, 155, 216, 0.16); }
+.detail-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* 正文排版：适配 5000 字长文阅读（行高、留白、层级）+ 治愈系配色 */
+.detail-content {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  padding: 36px 36px 46px;
+  box-shadow: 0 12px 30px rgba(58, 155, 216, 0.12);
+}
+.detail-content p {
+  font-size: 16.5px; line-height: 2.05; color: #3c5768;
+  padding: 0 6px; margin: 0 0 24px; text-align: justify;
+}
+.detail-content h2 {
+  font-size: 23px; font-weight: 700; color: #1f7ab3;
+  margin: 40px 6px 20px; padding-top: 8px; line-height: 1.5;
+  border-bottom: 1px solid rgba(126, 200, 242, 0.25); padding-bottom: 12px;
+  letter-spacing: .5px;
+}
+.detail-content h3 {
+  font-size: 18.5px; font-weight: 600; color: #3a9bd8;
+  margin: 28px 6px 14px; line-height: 1.5;
+}
+.detail-content h2 + p, .detail-content h3 + p { margin-top: 6px; }
+.detail-content ul, .detail-content ol {
+  margin: 6px 2px 28px 34px; line-height: 2.05; color: #3c5768;
+  padding-right: 8px; padding-left: 4px;
+}
+.detail-content li { margin-bottom: 16px; text-align: justify; position: relative; padding-left: 6px; }
+.detail-content li b { color: #1f7ab3; font-weight: 600; }
+.detail-content > h2:first-child { margin-top: 4px; }
+.detail-content blockquote {
+  border-left: 4px solid var(--sky-deep); background: rgba(126, 200, 242, 0.1);
+  padding: 12px 16px; border-radius: 0 12px 12px 0; margin: 0 0 18px; color: #4a6a7a;
+}
+.detail-doc {
+  margin-top: 18px; font-size: 12px; color: var(--ink-pale);
+  background: rgba(126, 200, 242, 0.08); border: 1px dashed rgba(122, 200, 242, 0.4);
+  border-radius: 12px; padding: 10px 14px;
+}
+.detail-source {
+  margin-top: 18px; font-size: 13px; color: #1f6fb0;
+  background: rgba(30, 111, 176, 0.08); border-radius: 12px; padding: 10px 14px; line-height: 1.6;
+}
+
+.loading, .empty-tip { text-align: center; color: var(--ink-pale); padding: 40px 0; font-size: 14px; }
+
+/* 悬浮「回到顶部」按钮 */
+.back-top {
+  position: fixed; right: 26px; bottom: 34px; z-index: 999;
+  width: 46px; height: 46px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--sky-deep), var(--green-deep)); color: #fff;
+  box-shadow: 0 6px 18px rgba(58, 155, 216, 0.3);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; visibility: hidden; transform: translateY(14px);
+  transition: opacity .4s ease, transform .4s ease, visibility .4s;
+}
+.back-top:hover { transform: scale(1.08) translateY(-2px); background: linear-gradient(135deg, #3a9bd8, #4fae83); }
+.back-top.show { opacity: 1; visibility: visible; transform: translateY(0); }
+.back-top .bt-arrow { font-size: 18px; line-height: 1; pointer-events: none; }
+.back-top .bt-tip {
+  position: absolute; right: calc(100% + 10px); top: 50%;
+  transform: translateY(-50%) translateX(4px); white-space: nowrap;
+  font-size: 12px; color: #fff; background: rgba(43, 74, 94, .88);
+  padding: 4px 10px; border-radius: 999px; opacity: 0;
+  transition: opacity .3s ease, transform .3s ease; pointer-events: none;
+}
+.back-top:hover .bt-tip { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+/* 小屏单列（保留兜底，不破坏布局） */
+@media (max-width: 640px) {
+  .page { padding: 18px 14px 60px; }
+  .arc-card { flex-direction: column; }
+  .detail-title { font-size: 22px; }
+  .detail-cover { height: 160px; }
+  .detail-content { padding: 26px 18px 34px; }
+  .detail-content p { padding: 0 2px; }
+  .detail-content h2 { margin: 34px 2px 18px; font-size: 21px; }
+  .detail-content h3 { margin: 24px 2px 12px; font-size: 17.5px; }
+  .detail-content ul, .detail-content ol { margin-left: 24px; }
+  .back-top { right: 16px; bottom: 22px; width: 42px; height: 42px; }
+}
