@@ -370,9 +370,6 @@ curl -s http://127.0.0.1:8000/v1/chat/completions \
 
 ---
 
-## 📂 项目目录结构
-
-```
 root/
 ├── ai-psy/                           # 网站主项目（部署到服务器 ~/ai-psy/）
 │   ├── app.py                        # Flask 后端（:6006）：全部页面路由 + /api/* 业务接口
@@ -417,7 +414,6 @@ root/
 └── autodl-tmp/                       # 高速数据盘（大模型层文件）
     ├── Qwen2.5-7B-Instruct/          #   bf16 原版基座（vLLM 启动基座）
     └── qwen25-7b-lora-ai_chat/       #   psych-chat 聊天 LoRA 适配器（训练产物）
-```
 
 ---
 
