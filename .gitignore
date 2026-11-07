@@ -179,3 +179,38 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Next.js / React
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Local environment configuration
+.env.*
+!.env.example
+!.env.*.example
+
+# AutoDL runtime data and model storage
+/autodl-fs/
+/autodl-tmp/
+
+# Local databases and temporary uploads
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+uploads/
+
+# Generated model weights
+*.joblib
+*.safetensors
+*.pt
+*.pth
+*.gguf
+
+# Temporary files
+*.tmp
+  
