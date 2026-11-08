@@ -99,7 +99,7 @@ if [ "$USED" -gt 2000 ]; then
     exit 1
   fi
   echo "[OK] vLLM 已停止，显存已释放（当前占用 ${USED}MiB）"
-  echo "     注意：训练完成后需重新 bash ~/ai-psy/start_all.sh 恢复 vLLM 与聊天服务。"
+  echo "     注意：训练完成后需重新启动 vLLM 与 Flask 服务（见 ai-psy/README.md「快速开始」）。"
 fi
 FREE=$(( $(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -n1) - USED ))
 if [ "$FREE" -lt 20000 ]; then
@@ -145,8 +145,8 @@ echo "   $FINAL_OUT_DIR"
 echo "   （adapter_config.json + adapter_model.safetensors + checkpoints/）"
 echo ""
 echo "后续步骤（二选一）："
-echo "  A. 线上部署（推荐，无需合并）：bash ~/ai-psy/start_all.sh"
-echo "     （检测到 bf16 基座+适配器会自动 --enable-lora 挂载 psych-chat，Flask 端 LORA_ENABLED 亦自动开启）"
+echo "  A. 线上部署（推荐，无需合并）：pkill -f \"vllm serve\" 后按部署手册 5.2 重启（自动加载 LoRA）"
+echo "     （vllm 服务已内置 --enable-lora 挂载 psych-chat，Flask 端 LLM_LORA_NAME 自动生效）"
 echo "     或手动：vllm serve /root/autodl-tmp/Qwen2.5-7B-Instruct --host 0.0.0.0 --port 8000 \\"
 echo "             --gpu-memory-utilization 0.9 --enable-lora --max-loras 1 \\"
 echo "             --lora-modules psych-chat=$FINAL_OUT_DIR"

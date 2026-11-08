@@ -11,7 +11,7 @@
 # 使用者通常只需修改下方「参数配置区」（样本量）。
 # =====================================================================
 set -e
-# 训练必须以 ai-psy 为工作目录、模块方式运行（import config 依赖）
+# 训练必须以 ai-psy 为工作目录、模块方式运行（rf 包内绝对导入依赖）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
@@ -28,7 +28,7 @@ VIDEO_SAMPLES=30000     # 视频任务合成指标条数（RF_VIDEO_SAMPLES）
 #   随机森林超参：n_estimators=200, class_weight="balanced_subsample",
 #                 random_state=42, n_jobs=-1（max_depth 等用 sklearn 默认）
 #   质量门槛：文本每因子准确率 ≥99.5%、视频整体 ≥95%，不达标不写模型文件
-#   模型输出目录：config.RF_MODEL_DIR = {AUTODL_FS}/models
+#   模型输出目录：rf.settings.RF_MODEL_DIR = {AUTODL_FS}/models
 #                 （服务器 /root/autodl-fs/models，本地回退项目同级 autodl-fs/models/）
 
 # ==================== 环境校验区 ====================
@@ -74,7 +74,7 @@ echo "===== [2/2] 训练视频模型：主导情绪 7 类（样本 ${VIDEO_SAMPL
 python -m rf.train_video
 
 # ==================== 结果输出区 ====================
-MODEL_DIR=$(python -c "import config; print(config.RF_MODEL_DIR)")
+MODEL_DIR=$(python -c "from rf.settings import RF_MODEL_DIR; print(RF_MODEL_DIR)")
 echo ""
 echo "✅ 训练完成。模型输出目录：$MODEL_DIR"
 N_TEXT=$(ls -1 "$MODEL_DIR"/scl90_*.joblib 2>/dev/null | wc -l)
@@ -91,6 +91,6 @@ fi
 [ -f "$MODEL_DIR/meta.json" ] && echo "   - meta.json：$(python -c "import json;print(json.load(open('$MODEL_DIR/meta.json',encoding='utf-8')).get('sklearn_version','?'))")（sklearn 版本契约）"
 echo ""
 echo "后续业务对接："
-echo "  1. 重启 Flask 生效（模型仅进程首次调用时加载）：bash ~/ai-psy/start_all.sh"
+echo "  1. 重启 Flask 生效（模型仅进程首次调用时加载）：pkill -f run_server.py 后重新 python run_server.py"
 echo "  2. 验证：提交一次 SCL-90 测评，报告中「严重程度来源」应显示 rf"
 echo "更多说明见 rf/README.md（参数详解 / 质量门槛 / 常见问题）"

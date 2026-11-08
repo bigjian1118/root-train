@@ -13,7 +13,7 @@
 运行：
     python -m rf.train_video
 产物：
-    {config.RF_MODEL_DIR}/emotion_rf.joblib + meta.json
+    {RF_MODEL_DIR}/emotion_rf.joblib + meta.json
 """
 import json
 import os
@@ -21,8 +21,8 @@ import time
 
 import numpy as np
 
-import config
 from rf import predictor
+from rf.settings import RF_MODEL_DIR
 
 
 # 各情绪类对应的"主导情绪"（采样时抬高其概率），unknown 表示无有效帧
@@ -113,10 +113,10 @@ def main() -> None:
         print("[train_video] 准确率低于 95%，不写模型文件，请增大样本量后重试")
         return
 
-    os.makedirs(config.RF_MODEL_DIR, exist_ok=True)
-    joblib.dump(clf, os.path.join(config.RF_MODEL_DIR, "emotion_rf.joblib"))
+    os.makedirs(RF_MODEL_DIR, exist_ok=True)
+    joblib.dump(clf, os.path.join(RF_MODEL_DIR, "emotion_rf.joblib"))
 
-    meta_path = os.path.join(config.RF_MODEL_DIR, "meta.json")
+    meta_path = os.path.join(RF_MODEL_DIR, "meta.json")
     meta = {}
     if os.path.exists(meta_path):
         with open(meta_path, "r", encoding="utf-8") as f:
@@ -130,7 +130,7 @@ def main() -> None:
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
-    print(f"[train_video] 完成，模型已写入 {config.RF_MODEL_DIR}")
+    print(f"[train_video] 完成，模型已写入 {RF_MODEL_DIR}")
 
 
 if __name__ == "__main__":

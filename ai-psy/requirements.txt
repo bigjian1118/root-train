@@ -1,6 +1,20 @@
-# pyfeat_env 后端依赖（py-feat / CPU torch 已按 README.md 安装，此处仅补充 Web 层）
+# Web 服务层（Flask + SQLAlchemy 2.0 + PostgreSQL/pgvector）
 flask>=3.0
+flask-sqlalchemy>=3.1
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+pgvector>=0.2.5
 requests>=2.31
-# 随机森林（规则蒸馏）：文本因子严重程度分级 + 视频主导情绪分类（rf/ 子包）
+python-dotenv>=1.0
+
+# 算法层：随机森林（规则蒸馏）文本因子分级 / 视频主导情绪分类（rf/ 子包）
 scikit-learn==1.5.2
 joblib>=1.3
+
+# 视频表情分析依赖（py-feat 需独立环境/镜像，按 README 说明安装）
+# py-feat==0.6.1
+# imageio 用于网关兜底统计帧数；imageio-ffmpeg 提供 ffmpeg 二进制，
+# 网关用它把浏览器录制的 webm 转成 mp4（py-feat 用 av 的 stream.frames 取帧数，
+# matroska/webm 该字段恒为 0，会得到 0 帧）
+imageio>=2.31
+imageio-ffmpeg>=0.4.9

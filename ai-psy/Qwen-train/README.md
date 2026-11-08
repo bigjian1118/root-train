@@ -179,8 +179,8 @@ vllm serve /root/autodl-tmp/Qwen2.5-7B-Instruct \
 curl http://127.0.0.1:8000/v1/models    # 验证就绪，预期列出基座与 psych-chat
 ```
 
-- `ai-psy/start_all.sh` 已自动化：检测到 bf16 基座 + 适配器目录即自动追加 `--enable-lora` 挂载参数
-- Flask 端 `ai-psy/config.py` 的 `LORA_ENABLED` 自动检测适配器目录存在即开启，无需手动改配置
+- vLLM 启动命令固定追加 `--enable-lora` / `--lora-modules psych-chat=...` 挂载参数
+- Flask 端 `ai-psy/server/config.py` 通过 `LLM_LORA_NAME` 指定 LoRA 模型名，无需手工拼请求体
 
 ## 七、常见问题
 
@@ -188,7 +188,7 @@ curl http://127.0.0.1:8000/v1/models    # 验证就绪，预期列出基座与 p
 |---|---|---|
 | `ImportError: cannot import name 'PytorchGELUTanh'`（autoawq） | 本地无 bf16 基座，config 回退 AWQ 路径 | 按「环境依赖」下载 bf16 基座 |
 | 日志显示 `模式：AWQ 量化基座 + fp16 LoRA` | bf16 目录名不是 `Qwen2.5-7B-Instruct` | 核对 `/root/autodl-tmp/Qwen2.5-7B-Instruct/config.json` |
-| 训练启动即 CUDA OOM | vLLM 未停，显存被占 | `pkill -f "vllm serve"` 后重跑；`train_all.sh` 会自动检测腾退；训练后聊天需重跑 `bash ~/ai-psy/start_all.sh` 恢复 |
+| 训练启动即 CUDA OOM | vLLM 未停，显存被占 | `pkill -f "vllm serve"` 后重跑；`train_all.sh` 会自动检测腾退；训练后需按部署手册 5.2 重启 vLLM 恢复聊天服务 |
 | `libgomp: Invalid value for OMP_NUM_THREADS` | 环境变量被设成非法值 | `export OMP_NUM_THREADS=8`（train_all.sh 已内置） |
 | 聊天无个性化风格 | 训完没重启 vLLM 挂载 adapter | 按第七节执行 |
 | 合并报 quantization 相关错误 | 用 4bit/AWQ 加载去 merge | 合并必须 bf16 非量化加载基座（用 `merge_adapter.py` 默认行为即正确） |

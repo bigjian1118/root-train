@@ -52,7 +52,7 @@ conda activate pyfeat_env
 bash ai-psy/rf/train_rf.sh
 ```
 
-等价手动命令（必须在 **ai-psy 目录**下以模块方式运行，否则 `import config` 失败）：
+等价手动命令（必须在 **ai-psy 目录**下以模块方式运行，否则 `from rf import ...` 失败）：
 
 ```bash
 cd ~/ai-psy
@@ -94,7 +94,7 @@ python -m rf.train_text && python -m rf.train_video
 
 ## 六、模型导出
 
-- 输出目录：`config.RF_MODEL_DIR` = `{AUTODL_FS}/models`（真实服务器 `/root/autodl-fs/models`，本地回退项目同级 `autodl-fs/models/`）
+- 输出目录：`rf.settings.RF_MODEL_DIR` = `{AUTODL_FS}/models`（真实服务器 `/root/autodl-fs/models`，本地回退项目同级 `autodl-fs/models/`；可用环境变量 `RF_MODEL_DIR` 覆盖）
 - 持久化：`joblib.dump`（协议兼容 sklearn 版本校验，见下）
 - 命名规则（固定文件名，无版本号；重训即覆盖）：
 
@@ -124,7 +124,7 @@ python -m rf.train_text && python -m rf.train_video
 
 | 症状 | 原因 | 处理 |
 |---|---|---|
-| `ModuleNotFoundError: No module named 'rf'` / `import config` 失败 | 不在 ai-psy 目录运行，或用了 `python rf/train_text.py` 直接路径 | 必须 `cd ai-psy` 后 `python -m rf.train_text`（train_rf.sh 已自动处理） |
+| `ModuleNotFoundError: No module named 'rf'` | 不在 ai-psy 目录运行，或用了 `python rf/train_text.py` 直接路径 | 必须 `cd ai-psy` 后 `python -m rf.train_text`（train_rf.sh 已自动处理） |
 | 后端日志「未找到模型文件…使用规则判定」 | 未训练 / autodl-fs 未挂载 / 文件缺失 | `python -m rf.train_text && python -m rf.train_video` 重训后重启 Flask |
 | 「sklearn 版本与训练时不一致，回退规则判定」 | 推理环境 sklearn 主次版本 ≠ meta.json 记录 | 对齐版本或重训刷新 meta.json |
 | 准确率低于门槛、未写模型 | 样本量不足、伪标签类别覆盖不全 | 调大 `RF_TEXT_SAMPLES` / `RF_VIDEO_SAMPLES` 重训 |

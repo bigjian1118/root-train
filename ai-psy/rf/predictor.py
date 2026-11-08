@@ -3,7 +3,7 @@
 随机森林推理封装（混合模式：模型为主、规则兜底）。
 
 设计要点：
-  - 惰性单例：首次调用时才加载 config.RF_MODEL_DIR 下的 .joblib 模型，
+  - 惰性单例：首次调用时才加载 RF_MODEL_DIR 下的 .joblib 模型，
     进程内缓存；任一模型文件缺失 / meta 校验失败 -> 置不可用，之后直接走规则，
     不重复尝试加载、不向业务层抛异常。
   - 特征构造与训练脚本（train_text.py / train_video.py）严格共用本模块函数，
@@ -23,7 +23,7 @@ import json
 import os
 import threading
 
-import config
+from rf.settings import RF_MODEL_DIR
 
 # ==================== 常量（与训练/推理共用） ====================
 # 严重程度代码 -> 中文标签
@@ -179,7 +179,7 @@ def _load():
             return _STATE
         try:
             import joblib
-            model_dir = config.RF_MODEL_DIR
+            model_dir = RF_MODEL_DIR
             meta_path = os.path.join(model_dir, "meta.json")
             with open(meta_path, "r", encoding="utf-8") as f:
                 meta = json.load(f)
@@ -195,7 +195,7 @@ def _load():
             _STATE = {"text": text_models, "emotion": emotion_model, "meta": meta}
             print(f"[rf] 随机森林模型已加载（{len(text_models)} 因子 + 情绪分类器）")
         except FileNotFoundError:
-            print(f"[rf] 未找到模型文件（{config.RF_MODEL_DIR}），使用规则判定")
+            print(f"[rf] 未找到模型文件（{RF_MODEL_DIR}），使用规则判定")
             _STATE = False
         except Exception as e:
             print(f"[rf] 模型加载失败（{e}），使用规则判定")
