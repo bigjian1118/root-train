@@ -55,12 +55,16 @@ def _scl90_row_public(row: Scl90TextReport) -> dict:
 def _load_ai_content(text_report_id: str | None = None,
                      video_report_id: str | None = None) -> str:
     if text_report_id:
+        # 仅取纯文本报告的解读（video_report_id 为空），避免命中综合分析
         stmt = select(AiAnalysisReport.ai_content).where(
-            AiAnalysisReport.text_report_id == text_report_id
+            AiAnalysisReport.text_report_id == text_report_id,
+            AiAnalysisReport.video_report_id.is_(None),
         )
     elif video_report_id:
+        # 仅取纯视频报告的解读（text_report_id 为空），避免命中综合分析
         stmt = select(AiAnalysisReport.ai_content).where(
-            AiAnalysisReport.video_report_id == video_report_id
+            AiAnalysisReport.video_report_id == video_report_id,
+            AiAnalysisReport.text_report_id.is_(None),
         )
     else:
         return ""
@@ -235,6 +239,7 @@ def teacher_report_detail(report_id: str):
     scenario = crowd_tag_to_scenario(row.crowd_tag)
     return jsonify({
         "id": row.report_id,
+        "student_id": row.student_id,
         "student_name": row.student_name,
         "class": row.student_class,
         "scenario": scenario,
@@ -242,6 +247,54 @@ def teacher_report_detail(report_id: str):
         "scores": scores_from_report_row(row),
         "report": _load_ai_content(text_report_id=row.report_id),
         "submitted_at": row.submit_timestamp,
+    })
+
+
+@bp.get("/api/teacher/student/<sid>/factor-history")
+def teacher_student_factor_history(sid: str):
+    """返回该学生所有 SCL-90 报告的因子分（按时间升序），供折线图展示。"""
+    user, err = require_teacher()
+    if err:
+        return err
+    authorized = _teacher_classes(user["id"])
+    student = db.session.get(Student, sid)
+    if not student:
+        return jsonify({"error": "学生不存在"}), 404
+    if student.class_ not in authorized:
+        return jsonify({"error": "无权查看该学生数据"}), 403
+
+    rows = db.session.execute(
+        select(Scl90TextReport)
+        .where(Scl90TextReport.student_id == sid)
+        .order_by(Scl90TextReport.submit_timestamp.asc())
+    ).scalars().all()
+
+    factor_cols = [
+        ("躯体化", "somatization"),
+        ("强迫症状", "ocd"),
+        ("人际关系敏感", "interpersonal_sensitivity"),
+        ("抑郁", "depression"),
+        ("焦虑", "anxiety"),
+        ("敌对", "hostility"),
+        ("恐怖", "phobic_anxiety"),
+        ("偏执", "paranoid_ideation"),
+        ("精神病性", "psychoticism"),
+        ("其他", "additional"),
+    ]
+    history = []
+    for row in rows:
+        item = {
+            "submit_time": row.submit_timestamp,
+            "total_score": row.total_score,
+            "factors": {cn: getattr(row, col) for cn, col in factor_cols},
+        }
+        history.append(item)
+
+    return jsonify({
+        "student_id": sid,
+        "student_name": student.name,
+        "factor_names": [cn for cn, _ in factor_cols],
+        "history": history,
     })
 
 

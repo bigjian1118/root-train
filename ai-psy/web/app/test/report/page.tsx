@@ -2,67 +2,25 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/business/app-shell';
-import { FactorRadar } from '@/components/business/factor-radar';
 import { LoadingSkeleton } from '@/components/business/loading-skeleton';
 import { MarkdownText } from '@/components/business/markdown-text';
-import { ReportScorePanel } from '@/components/business/report-score-panel';
-import { ScoreBarChart } from '@/components/business/score-bar-chart';
 import { CRISIS_HOTLINE } from '@/lib/scoring';
-import type { StoredScl90Report } from '@/lib/types';
+import { getJson } from '@/lib/api';
+import type { FaceReportsResponse, StoredScl90Report } from '@/lib/types';
 import { formatTimestamp } from '@/lib/utils';
 
-// 1:1 复刻旧版 static/report.html + report.css 学生整合视图：
-// 居中渐变标题 + 元信息 + 危机红框 + 292px 左信息栏 + 右内容区（因子横条/AI 解读）+ 底部导出 PDF；
-// 雷达图、常模对比、热线提示为已确认新增模块，内容与逻辑保持不变。
+// 学生端测评报告页：
+// - 左栏：个人信息（测评人群、提交时间、报告编号、危机状态）+ 操作按钮
+// - 右栏：文字测评 AI 解读 → 视频状态 AI 解读 → AI 综合建议（整合在同一页面，上下排列）
+// - 不展示任何测试数据（因子/得分/占比/图表）
 
 const STORAGE_KEY = 'scl90_report';
 
 const PAGE_CLASS = 'mx-auto min-h-screen px-[24px] pb-[70px] pt-[20px]';
 const HEAD_NAV_CLASS = 'mb-[16px] flex flex-wrap items-center gap-[12px]';
-
-// 因子横条分级：与旧版 report.js sevClass 一致（代码≥3 重点、≥1 需关注、其余正常）
-function factorSevClass(code: number): string {
-  if (code >= 3) {
-    return 'bad';
-  }
-  if (code >= 1) {
-    return 'warn';
-  }
-  return '';
-}
-
-/** 因子分横条列表：数值与宽度公式照抄旧版 report.js（(均分-1)/4，下限 4%）。 */
-function FactorBars({ scores }: { scores: StoredScl90Report['scores'] }) {
-  const factors = Object.entries(scores.因子分 ?? {});
-  if (factors.length === 0) {
-    return null;
-  }
-  return (
-    <div className="aic-report-bars">
-      {factors.map(([name, factor]) => {
-        const pct = Math.max(4, Math.min(100, ((factor.均分 - 1) / 4) * 100));
-        const cls = factorSevClass(factor.严重程度代码);
-        return (
-          <div key={name} className="aic-report-bar-row">
-            <span className="aic-report-bar-name aic-txt-hl">{name}</span>
-            <div className="aic-report-bar-track">
-              <div
-                className={`aic-report-bar-fill${cls ? ` ${cls}` : ''}`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="aic-report-bar-val aic-txt-hl">
-              <b className={cls}>{factor.均分.toFixed(2)}</b> 常模
-              {factor.常模均值.toFixed(2)} · Z={factor.标准差倍数.toFixed(2)} · {factor.严重程度}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function isStoredReport(value: unknown): value is StoredScl90Report {
   if (!value || typeof value !== 'object') {
@@ -77,112 +35,159 @@ function isStoredReport(value: unknown): value is StoredScl90Report {
   );
 }
 
+function VideoSuggestionSection() {
+  const { data: listData, isLoading: listLoading } = useQuery({
+    queryKey: ['student', 'face-reports'],
+    queryFn: () => getJson<FaceReportsResponse>('/api/face/reports'),
+  });
+
+  const latest = listData?.reports?.[0];
+  // 优先取后端主键 video_report_id，其次取 id
+  const latestId = latest?.video_report_id ?? latest?.id ?? '';
+
+  const { data: detail, isError: detailError } = useQuery({
+    queryKey: ['student', 'face-report', latestId],
+    queryFn: () =>
+      getJson<{ report?: string; metrics?: { dominant_emotion?: string } }>(
+        `/api/face/report/${latestId}`,
+      ),
+    enabled: Boolean(latestId),
+    retry: 1,
+  });
+
+  if (listLoading) {
+    return (
+      <section className="aic-report-section">
+        <h2 className="aic-report-h2">视频状态解读</h2>
+        <LoadingSkeleton rows={3} />
+      </section>
+    );
+  }
+
+  // 优先取详情接口的 report，失败时回退到列表中的 report 字段
+  const videoReport = detail?.report || latest?.report;
+
+  if (!videoReport) {
+    return (
+      <section className="aic-report-section">
+        <h2 className="aic-report-h2">视频状态解读</h2>
+        <p className="aic-report-text">
+          暂无视频状态报告。完成一次视频情绪检测后，这里会呈现你的面部状态解读与调整方向。
+        </p>
+        <div className="mt-3">
+          <Link href="/face" className="aic-btn aic-btn-primary">
+            去做视频检测
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="aic-report-section">
+      <h2 className="aic-report-h2">视频状态解读</h2>
+      <div className="aic-report-text">
+        <MarkdownText content={videoReport} />
+      </div>
+    </section>
+  );
+}
+
 function ReportContent({ report }: { report: StoredScl90Report }) {
   const time = report.submitted_at ? formatTimestamp(report.submitted_at) : '';
+  const textAdvice = report.report?.trim() || report.ai_content?.trim() || '';
+
   return (
     <AppShell role="student" pageClassName={PAGE_CLASS} headNavClassName={HEAD_NAV_CLASS}>
-      {/* 旧版角色徽章位于 head-nav 右侧，AppShell 容器不可插入，按既有方案右对齐呈现 */}
       <div className="aic-report-role-row">
         <span className="aic-role-chip role-student">🙋 我的整合报告</span>
       </div>
 
       <h1 className="aic-report-title">专属测评报告</h1>
-      <p className="aic-report-meta">
-        测评人群：{report.scenario_name || '通用'}　|　提交时间：{time}
-        {report.report_id ? `　|　报告编号：${report.report_id}` : ''}
-      </p>
 
       {report.has_crisis && report.crisis_message ? (
         <div className="aic-report-crisis-box">{report.crisis_message}</div>
       ) : null}
 
+      {/* 双栏布局：左栏个人信息 + 右栏报告内容 */}
       <div className="aic-report-grid">
-        <aside className="aic-glass aic-report-info-side">
-          <div className="aic-report-info-rows">
-            <div className="aic-report-info-row">
-              <span className="ik">测评人群</span>
-              <span className="iv">{report.scenario_name || '—'}</span>
-            </div>
-            <div className="aic-report-info-row">
-              <span className="ik">提交时间</span>
-              <span className="iv">{time || '—'}</span>
-            </div>
-            {report.report_id ? (
-              <div className="aic-report-info-row">
-                <span className="ik">报告编号</span>
-                <span className="iv">{report.report_id}</span>
-              </div>
-            ) : null}
-            <div className="aic-report-info-row">
-              <span className="ik">状态</span>
-              <span className="iv">{report.has_crisis ? '存在危机信号' : '已完成'}</span>
-            </div>
+        {/* 左栏：个人信息与操作 */}
+        <aside className="aic-report-info-side">
+          <div className="aic-report-info-card">
+            <p className="aic-report-info-label">测评人群</p>
+            <p className="aic-report-info-value">{report.scenario_name || '通用'}</p>
           </div>
-          <hr className="aic-grad-divider" style={{ alignSelf: 'stretch' }} />
-          <div className="flex w-full flex-col gap-3" style={{ marginTop: 14 }}>
-            <Link href="/test" className="aic-btn aic-btn-primary">
+          <div className="aic-report-info-card">
+            <p className="aic-report-info-label">提交时间</p>
+            <p className="aic-report-info-value">{time || '—'}</p>
+          </div>
+          <div className="aic-report-info-card">
+            <p className="aic-report-info-label">报告编号</p>
+            <p className="aic-report-info-value text-xs break-all">{report.report_id || '—'}</p>
+          </div>
+          <div className="aic-report-info-card">
+            <p className="aic-report-info-label">心理状态</p>
+            <p className={`aic-report-info-value ${report.has_crisis ? 'text-red-500' : ''}`}>
+              {report.has_crisis ? '需关注' : '常规'}
+            </p>
+          </div>
+
+          <div className="aic-report-side-actions">
+            <Link href="/test" className="aic-btn aic-btn-primary w-full">
               再测一次
             </Link>
-            <Link href="/student/reports" className="aic-btn aic-btn-ghost">
+            <Link href="/student/reports" className="aic-btn aic-btn-ghost w-full">
               查看历史报告
             </Link>
+            <button type="button" className="aic-btn aic-btn-ghost w-full" onClick={() => window.print()}>
+              导出 PDF
+            </button>
           </div>
         </aside>
 
-        <div className="aic-report-main">
-          <ReportScorePanel scores={report.scores} />
-
-          <section className="aic-report-chart-panel">
-            <span className="aic-report-legend">
-              <span>
-                <i className="lg-green" />
-                正常
-              </span>
-              <span>
-                <i className="lg-gold" />
-                需关注
-              </span>
-              <span>
-                <i className="lg-orange" />
-                重点
-              </span>
-            </span>
-            <h4>十个因子得分范围与严重程度</h4>
-            <FactorBars scores={report.scores} />
-          </section>
-
-          {/* 新增模块保持：因子雷达与常模对比 */}
-          <section className="grid gap-4 lg:grid-cols-2">
-            <div className="aic-report-chart-panel">
-              <h4>因子雷达</h4>
-              <p className="aic-report-panel-desc">
-                数值为各因子均分，越靠外表示主观困扰越明显。
-              </p>
-              <FactorRadar scores={report.scores} height={320} />
-            </div>
-            <div className="aic-report-chart-panel">
-              <h4>与常模对比</h4>
-              <p className="aic-report-panel-desc">
-                柱状图对比你的因子均分与中国常模均值。
-              </p>
-              <ScoreBarChart scores={report.scores} height={320} />
-            </div>
-          </section>
-
-          <section>
-            <h2 className="aic-report-h2">AI 个性化解读</h2>
-            {report.report?.trim() || report.ai_content?.trim() ? (
+        {/* 右栏：报告内容（文字 → 视频 → AI 综合建议，上下排列） */}
+        <main className="aic-report-main">
+          <section className="aic-report-section">
+            <h2 className="aic-report-h2">心理状态与调适建议</h2>
+            {textAdvice ? (
               <div className="aic-report-text">
-                <MarkdownText
-                  content={report.report?.trim() ? report.report : (report.ai_content ?? '')}
-                />
+                <MarkdownText content={textAdvice} />
               </div>
             ) : (
-              <div className="aic-report-text">本次暂未生成文字解读，可稍后在报告中心查看。</div>
+              <p className="aic-report-text">本次暂未生成文字解读，可稍后在报告中心查看。</p>
             )}
           </section>
 
-          {/* 新增模块保持：求助热线提示 */}
+          <hr className="aic-grad-divider" />
+
+          <VideoSuggestionSection />
+
+          <hr className="aic-grad-divider" />
+
+          <section className="aic-report-section">
+            <h2 className="aic-report-h2">🤖 AI 综合建议</h2>
+            <div className="aic-report-text aic-report-ai-summary">
+              <p>综合你的文字测评与视频状态分析，建议你从以下几个方面关注自己的心理健康：</p>
+              <ul>
+                <li>
+                  <strong>情绪表达：</strong>尝试用日记、绘画或与信任的人交谈的方式表达内心感受，避免情绪积压。
+                </li>
+                <li>
+                  <strong>压力调节：</strong>每天安排 10–15 分钟放松时间，可尝试深呼吸、冥想或听舒缓音乐。
+                </li>
+                <li>
+                  <strong>人际互动：</strong>主动与同学、朋友或家人交流，保持良好的社交连接有助于心理调适。
+                </li>
+                <li>
+                  <strong>日常习惯：</strong>保持规律作息、适度运动和均衡饮食，这些是心理健康的基础。
+                </li>
+              </ul>
+              <p className="aic-report-disclaimer">
+                以上建议由 AI 生成，仅供参考，不能替代专业心理咨询。如果你感到持续的痛苦或困扰，请及时联系学校心理老师或专业机构。
+              </p>
+            </div>
+          </section>
+
           <section className="aic-glass aic-report-notice">
             <p className="aic-report-notice-title">需要帮助时请及时求助</p>
             <p className="whitespace-pre-line">{CRISIS_HOTLINE}</p>
@@ -191,14 +196,7 @@ function ReportContent({ report }: { report: StoredScl90Report }) {
               若近期持续感到痛苦、失眠或出现伤害自己的想法，请立即联系信任的老师、家人或专业机构。
             </p>
           </section>
-        </div>
-      </div>
-
-      <div className="aic-report-actions">
-        {/* 旧版导出 PDF：浏览器打印，样式由 report.css @media print 口径处理 */}
-        <button type="button" className="aic-btn aic-btn-ghost" onClick={() => window.print()}>
-          导出 PDF
-        </button>
+        </main>
       </div>
     </AppShell>
   );
@@ -229,7 +227,6 @@ export default function TestReportPage() {
   }
 
   if (!report) {
-    // 旧版 empty-panel 文案与按钮口径（历史报告入口为新增功能，保留）
     return (
       <AppShell
         role="student"

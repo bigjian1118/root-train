@@ -38,7 +38,36 @@ function AiResultContent() {
   const [task, setTask] = useState<MaterialAiTaskState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/teacher/materials/ai/task/${encodeURIComponent(taskId)}/download`);
+      if (!res.ok) {
+        throw new Error(`下载失败（${res.status}）`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${task?.plan_type || '活动方案'}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: '下载成功', variant: 'success' });
+    } catch (err) {
+      toast({
+        title: '下载失败',
+        description: err instanceof Error ? err.message : '网络异常',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const fetchOnce = async () => {
     try {
@@ -151,9 +180,10 @@ function AiResultContent() {
               重新生成
             </Button>
             <Button variant="outline"
-              onClick={() => window.open(`/api/teacher/materials/ai/task/${taskId}/download`, '_blank')}>
-              <FileDown className="h-4 w-4" />
-              下载 .docx
+              onClick={() => void handleDownload()}
+              disabled={downloading}>
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {downloading ? '下载中…' : '下载 .docx'}
             </Button>
             <Button onClick={() => void handleSave()} disabled={saving || Boolean(task.saved_material_id)}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

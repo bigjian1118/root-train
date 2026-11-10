@@ -1793,6 +1793,34 @@
     max-width: 65%;
   }
 
+  /* 学生端报告左栏：信息卡片与操作按钮 */
+  .aic-report-info-card {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(58, 155, 216, 0.15);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .aic-report-info-label {
+    font-size: 12px;
+    color: #6c8494;
+    margin-bottom: 4px;
+  }
+  .aic-report-info-value {
+    font-size: 14px;
+    color: #2b4a5e;
+    font-weight: 600;
+    word-break: break-all;
+  }
+  .aic-report-side-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
   /* 右内容区（report.css .report-main / h2 / h4 / .text-col）；
      Tailwind preflight 会重置标题字号字重，故显式补 font-weight */
   .aic-report-main {
@@ -1825,6 +1853,35 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  /* 学生端报告页：单栏布局（无左侧信息栏） */
+  .aic-report-single-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    max-width: 820px;
+    margin: 0 auto;
+  }
+  .aic-report-section {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 14px;
+    padding: 20px 22px;
+    border: 1px solid rgba(58, 155, 216, 0.12);
+  }
+  .aic-report-ai-summary {
+    background: linear-gradient(135deg, rgba(58, 155, 216, 0.06), rgba(130, 200, 180, 0.06));
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .aic-report-ai-summary ul {
+    list-style: disc;
+    padding-left: 20px;
+    margin: 10px 0;
+  }
+  .aic-report-ai-summary li {
+    margin-bottom: 8px;
+    line-height: 1.7;
   }
 
   /* 图表容器与图例（common.css .chart-panel / .legend，数值照抄） */

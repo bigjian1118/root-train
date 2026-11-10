@@ -65,11 +65,13 @@ def _load_ai_content(text_report_id: str | None = None,
     """读取某份报告最新的 AI 正文（无则空串）。"""
     if text_report_id:
         stmt = select(AiAnalysisReport.ai_content).where(
-            AiAnalysisReport.text_report_id == text_report_id
+            AiAnalysisReport.text_report_id == text_report_id,
+            AiAnalysisReport.video_report_id.is_(None),
         )
     elif video_report_id:
         stmt = select(AiAnalysisReport.ai_content).where(
-            AiAnalysisReport.video_report_id == video_report_id
+            AiAnalysisReport.video_report_id == video_report_id,
+            AiAnalysisReport.text_report_id.is_(None),
         )
     else:
         return ""

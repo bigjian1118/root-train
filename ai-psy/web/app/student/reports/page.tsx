@@ -19,11 +19,9 @@ import { useState } from 'react';
 import { AppShell } from '@/components/business/app-shell';
 import { AuthGuard } from '@/components/business/auth-guard';
 import { EmptyState } from '@/components/business/empty-state';
-import { FactorRadar } from '@/components/business/factor-radar';
 import { LoadingSkeleton } from '@/components/business/loading-skeleton';
 import { MarkdownText } from '@/components/business/markdown-text';
 import { PageHeader } from '@/components/business/page-header';
-import { ReportScorePanel } from '@/components/business/report-score-panel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -36,7 +34,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
@@ -60,19 +57,6 @@ const SCENARIO_LABELS: Record<string, string> = {
   primary_student: '小学生',
   junior_student: '中学生',
   college_student: '大学生',
-};
-
-const FACTOR_EN_TO_CN: Record<string, string> = {
-  somatization: '躯体化',
-  ocd: '强迫症状',
-  interpersonal_sensitivity: '人际关系敏感',
-  depression: '抑郁',
-  anxiety: '焦虑',
-  hostility: '敌对',
-  phobic_anxiety: '恐怖',
-  paranoid_ideation: '偏执',
-  psychoticism: '精神病性',
-  additional: '其他',
 };
 
 type RowKind = 'text' | 'video';
@@ -119,44 +103,6 @@ function hasCrisis(report: TextReportSummary): boolean {
   return Boolean(report.risk_signal ?? report.crisis);
 }
 
-function topFactorLabel(report: TextReportSummary): string {
-  if (report.top_factor) {
-    return report.top_factor;
-  }
-  if (report.factor_avgs) {
-    const entries = Object.entries(report.factor_avgs).filter(
-      (entry): entry is [string, number] => typeof entry[1] === 'number',
-    );
-    if (entries.length > 0) {
-      const top = entries.sort((a, b) => b[1] - a[1])[0];
-      return `${top[0]} ${top[1].toFixed(2)}`;
-    }
-  }
-  const columns = Object.entries(FACTOR_EN_TO_CN)
-    .map(([en, cn]) => {
-      const value = report[en as keyof TextReportSummary];
-      return typeof value === 'number' ? { cn, value } : null;
-    })
-    .filter((item): item is { cn: string; value: number } => Boolean(item))
-    .sort((a, b) => b.value - a.value);
-  return columns[0] ? `${columns[0].cn} ${columns[0].value.toFixed(2)}` : '—';
-}
-
-function emotionPercent(value: number): string {
-  return value <= 1 ? `${Math.round(value * 100)}%` : value.toFixed(1);
-}
-
-function topEmotions(emotions?: Record<string, number>): { name: string; value: number }[] {
-  if (!emotions) {
-    return [];
-  }
-  return Object.entries(emotions)
-    .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([name, value]) => ({ name, value }));
-}
-
 function TextDetailPanel({ reportId }: { reportId: string }) {
   const query = useQuery({
     queryKey: ['student', 'report', reportId],
@@ -191,14 +137,15 @@ function TextDetailPanel({ reportId }: { reportId: string }) {
 
   return (
     <div className="space-y-4">
-      <ReportScorePanel scores={detail.scores} />
-      <FactorRadar scores={detail.scores} height={300} />
+      {/* 学生端不展示得分/因子等测试数据，仅展示 AI 解读建议 */}
       {detail.report ? (
         <div>
-          <p className="mb-2 text-sm font-medium">报告解读</p>
+          <p className="mb-2 text-sm font-medium">心理状态调适建议</p>
           <MarkdownText content={detail.report} />
         </div>
-      ) : null}
+      ) : (
+        <p className="text-sm text-muted-foreground">本次暂无文字解读。</p>
+      )}
     </div>
   );
 }
@@ -231,51 +178,17 @@ function FaceDetailPanel({ reportId }: { reportId: string }) {
     );
   }
 
-  const metrics = query.data?.metrics;
-  const emotions = topEmotions(metrics?.emotions ?? query.data?.emotions);
-
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl bg-muted/40 p-3">
-          <p className="text-xs text-muted-foreground">突出维度</p>
-          <p className="mt-1 text-sm font-medium">
-            {query.data?.prominent_dimension ?? query.data?.top_factor ?? '—'}
-          </p>
-        </div>
-        <div className="rounded-xl bg-muted/40 p-3">
-          <p className="text-xs text-muted-foreground">主要表情</p>
-          <p className="mt-1 text-sm font-medium">{metrics?.dominant_emotion ?? '—'}</p>
-        </div>
-        <div className="rounded-xl bg-muted/40 p-3">
-          <p className="text-xs text-muted-foreground">微笑 / 人脸帧</p>
-          <p className="mt-1 text-sm font-medium">
-            {metrics?.smile_detected ? '检测到微笑' : '未检测到'} · {metrics?.face_frames ?? 0} 帧
-          </p>
-        </div>
-      </div>
-
-      {emotions.length > 0 ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">表情占比</p>
-          {emotions.map((emotion) => (
-            <div key={emotion.name} className="space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{emotion.name}</span>
-                <span>{emotionPercent(emotion.value)}</span>
-              </div>
-              <Progress value={Math.min(100, emotion.value <= 1 ? emotion.value * 100 : emotion.value)} />
-            </div>
-          ))}
-        </div>
-      ) : null}
-
+      {/* 学生端不展示表情占比等测试数据，仅展示 AI 状态解读 */}
       {query.data?.report ? (
         <div>
-          <p className="mb-2 text-sm font-medium">AI 状态解读</p>
+          <p className="mb-2 text-sm font-medium">视频状态解读</p>
           <MarkdownText content={query.data.report} />
         </div>
-      ) : null}
+      ) : (
+        <p className="text-sm text-muted-foreground">本次暂无视频状态解读。</p>
+      )}
     </div>
   );
 }
@@ -330,24 +243,10 @@ function TextReportCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-muted/40 px-2 py-2">
-            <p className="text-[11px] text-muted-foreground">总分</p>
-            <p className="text-lg font-semibold">{report.total_score ?? '—'}</p>
-          </div>
-          <div className="rounded-lg bg-muted/40 px-2 py-2">
-            <p className="text-[11px] text-muted-foreground">阳性项目</p>
-            <p className="text-lg font-semibold">
-              {report.positive_count ?? report.pos_item_count ?? '—'}
-            </p>
-          </div>
-          <div className="rounded-lg bg-muted/40 px-2 py-2">
-            <p className="text-[11px] text-muted-foreground">首要因子</p>
-            <p className="truncate text-sm font-medium" title={topFactorLabel(report)}>
-              {topFactorLabel(report)}
-            </p>
-          </div>
-        </div>
+        {/* 学生端不展示测试数据（得分/因子/占比），仅展示基本信息与危机状态 */}
+        <p className="text-sm text-muted-foreground">
+          点击「详情」查看你的心理状态调适建议。
+        </p>
         {expanded && id ? <ExpandedPanel detailKey={`text:${id}`} /> : null}
       </CardContent>
     </Card>
@@ -366,7 +265,6 @@ function VideoReportCard({
   onDelete: () => void;
 }) {
   const id = videoId(report);
-  const emotions = topEmotions(report.emotions);
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -393,17 +291,8 @@ function VideoReportCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {emotions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {emotions.map((emotion) => (
-              <Badge key={emotion.name} variant="secondary">
-                {emotion.name} {emotionPercent(emotion.value)}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">本次未提取到明显表情分布。</p>
-        )}
+        {/* 学生端不展示表情占比数据，仅提示查看详情 */}
+        <p className="text-sm text-muted-foreground">点击「详情」查看视频状态解读与调整方向。</p>
         {expanded && id ? <ExpandedPanel detailKey={`video:${id}`} /> : null}
       </CardContent>
     </Card>

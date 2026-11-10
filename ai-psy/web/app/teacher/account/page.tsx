@@ -78,19 +78,49 @@ function ClassMultiSelect({ options, selected, onChange, maxCount = 0 }: {
       : [...selected, name]);
   };
 
+  const addCustom = () => {
+    const name = keyword.trim();
+    if (!name || selected.includes(name)) {
+      return;
+    }
+    if (maxCount > 0 && selected.length >= maxCount) {
+      return;
+    }
+    onChange([...selected, name]);
+    setKeyword('');
+  };
+
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          placeholder="搜索班级名称快速筛选"
-          className="pl-9"
-        />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                addCustom();
+              }
+            }}
+            placeholder="搜索或输入班级名称，回车添加"
+            className="pl-9"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={addCustom}
+          disabled={!keyword.trim() || (maxCount > 0 && selected.length >= maxCount)}
+          className="inline-flex h-9 items-center rounded-md bg-brand-sky px-3 text-xs font-medium text-white hover:bg-brand-sky/90 disabled:opacity-50"
+        >
+          添加
+        </button>
       </div>
       {groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">没有匹配的班级。</p>
+        <p className="text-sm text-muted-foreground">
+          {keyword ? '没有匹配的班级，可点击「添加」创建新班级。' : '暂无可选班级，可直接输入班级名称添加。'}
+        </p>
       ) : (
         <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
           {groups.map((group) => (

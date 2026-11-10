@@ -252,6 +252,20 @@ function HomeArticles() {
 }
 
 function HomeContent() {
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+
+  // 教师不使用师生共用首页，直接跳转个人中心
+  useEffect(() => {
+    if (user?.role === 'teacher') {
+      router.replace('/teacher/account');
+    }
+  }, [user?.role, router]);
+
+  if (user?.role === 'teacher') {
+    return null;
+  }
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden">
       <HomeTopbar />
