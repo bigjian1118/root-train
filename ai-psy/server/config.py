@@ -51,6 +51,12 @@ class Config:
     REMOTE_API_KEY = os.environ.get("REMOTE_API_KEY", "")
     REMOTE_MODEL = os.environ.get("REMOTE_MODEL", "gpt-4o-mini")
 
+    # ---------- 生成扩展参数（DeepSeek 官方示例 extra_body 字段，默认空不注入） ----------
+    # LLM_THINKING=enabled 开启思考模式；LLM_REASONING_EFFORT=high 指定推理强度。
+    # 仅对支持的远程模型生效，vLLM 本地通道保持原有 payload。
+    LLM_THINKING = os.environ.get("LLM_THINKING", "")
+    LLM_REASONING_EFFORT = os.environ.get("LLM_REASONING_EFFORT", "")
+
     # ---------- 嵌入模型 BGE-M3（独立模型，不与 LLM 混用） ----------
     # 优先独立嵌入服务（vLLM embedding / TEI / FastAPI 均可，OpenAI 兼容 /v1/embeddings）
     EMBEDDING_BASE_URL = os.environ.get("EMBEDDING_BASE_URL", "http://127.0.0.1:8001/v1")

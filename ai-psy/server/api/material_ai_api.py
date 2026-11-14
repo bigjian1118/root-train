@@ -83,10 +83,10 @@ def task_download(task_id: str):
     user, err = require_teacher()
     if err:
         return err
-    result, message = material_ai_service.build_download(task_id, user["id"])
-    if result is None:
-        return jsonify({"error": message}), 400
-    blob, file_name = result
+    # build_download 契约：成功返回 (docx字节, 文件名)，失败返回 (None, 错误信息)
+    blob, file_name = material_ai_service.build_download(task_id, user["id"])
+    if blob is None:
+        return jsonify({"error": file_name}), 400
     return send_file(
         BytesIO(blob),
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

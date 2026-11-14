@@ -59,6 +59,18 @@ def _endpoint() -> str:
     return _provider()["base_url"].rstrip("/") + "/chat/completions"
 
 
+def _apply_extra_params(payload: dict) -> dict:
+    """按配置注入 DeepSeek 扩展参数（官方示例 extra_body 即 HTTP 顶层 JSON 字段）。
+
+    默认两项为空不注入，vLLM 等其他 provider 行为完全不变。
+    """
+    if Config.LLM_THINKING:
+        payload["thinking"] = {"type": Config.LLM_THINKING}
+    if Config.LLM_REASONING_EFFORT:
+        payload["reasoning_effort"] = Config.LLM_REASONING_EFFORT
+    return payload
+
+
 def _mock_reply(messages: list) -> str:
     last_user = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
     return f"【Mock 模式】已收到：{last_user[:80]}。当前未连接大模型服务。"
@@ -78,6 +90,7 @@ def chat_non_stream(messages: list, tools: list | None = None,
         "temperature": Config.LLM_TEMPERATURE if temperature is None else temperature,
         "max_tokens": max_tokens or Config.LLM_MAX_TOKENS,
     }
+    _apply_extra_params(payload)
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
@@ -115,6 +128,7 @@ def chat_stream(messages: list, temperature: float | None = None,
         "max_tokens": max_tokens or Config.LLM_MAX_TOKENS,
         "stream": True,
     }
+    _apply_extra_params(payload)
     try:
         with requests.post(_endpoint(), headers=_headers(), json=payload,
                            timeout=Config.LLM_TIMEOUT, stream=True) as resp:

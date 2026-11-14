@@ -12,12 +12,14 @@
 """
 import atexit
 import glob
+import logging
 import math
 import os
 import shutil
 import subprocess
 import tempfile
 import threading
+import time
 
 from flask import Flask, jsonify, request
 
@@ -57,6 +59,25 @@ MAX_ANALYZE_FRAMES = int(os.environ.get("PYFEAT_MAX_FRAMES", "10"))
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 
+# ---- 监测日志（便携版专用）----
+# 独立文件 gateway_monitor.log：与 启动.bat 对 stdout 的重定向文件（gateway.log）分开，
+# 避免同一文件双句柄追加写串扰；每条带时间戳，用于排查"视频分析报错"发生在哪一段。
+_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+_monitor_logger = logging.getLogger("pyfeat-gateway.monitor")
+_monitor_logger.setLevel(logging.INFO)
+if not _monitor_logger.handlers:
+    _file_handler = logging.FileHandler(
+        os.path.join(_LOG_DIR, "gateway_monitor.log"), encoding="utf-8")
+    _file_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s"))
+    _monitor_logger.addHandler(_file_handler)
+
+
+def _monitor(msg: str) -> None:
+    """监测日志双写：文件（带时间戳）+ 控制台（进 gateway.log）。"""
+    _monitor_logger.info(msg)
+    print(f"[pyfeat-gateway] {msg}", flush=True)
+
 # py-feat 推理是 CPU 重任务，单进程内串行执行，避免并发导致内存翻倍
 _DETECTOR = None
 _DETECTOR_LOCK = threading.Lock()
@@ -72,6 +93,8 @@ def _get_detector():
         if _DETECTOR is None:
             from feat import Detector
 
+            _monitor("Detector 首次加载开始（约需 30-60 秒，期间视频分析请求请等待勿重启）")
+            _t = time.time()
             # 其余模型用 py-feat 默认值（retinaface / mobilefacenet / posenet），
             # 三者权重已在 setup_pyfeat_env.sh 离线预置，Detector 不会联网下载
             _DETECTOR = Detector(
@@ -79,7 +102,7 @@ def _get_detector():
                 emotion_model="resmasknet",
                 device="cpu",
             )
-            print("[pyfeat-gateway] Detector 加载完成", flush=True)
+            _monitor(f"Detector 加载完成，耗时 {time.time() - _t:.1f}s")
     return _DETECTOR
 
 
@@ -158,13 +181,19 @@ def _detect_frames(detector, frame_paths: list):
     import pandas as pd
 
     frames = []
+    failures = []
     for path in frame_paths:
         try:
             face_df = _as_dataframe(detector.detect_image(path))
             if not face_df.empty:
                 frames.append(face_df)
-        except Exception:
+        except Exception as exc:
+            # 历史坑点：此处静默 continue 曾把 np.mat 崩溃伪装成"未检测到人脸"，
+            # 故失败明细必须落监测日志，方便区分"视频里真没脸"与"管线代码异常"
+            failures.append(f"{os.path.basename(path)}: {type(exc).__name__}: {exc}")
             continue
+    if failures:
+        _monitor(f"单帧检测失败 {len(failures)}/{len(frame_paths)}，前 3 条明细：{failures[:3]}")
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
@@ -276,24 +305,31 @@ def analyze():
     handle, video_path = tempfile.mkstemp(suffix=ext, prefix="pyfeat_")
     os.close(handle)
     frame_dir = None
+    _t0 = time.time()
     try:
         video.save(video_path)
         # ffmpeg 抽帧后逐帧检测：帧数只取决于时长，webm 元数据 bug 与长视频失控从源头消除
         frame_dir, frame_paths = _extract_frames(video_path)
         if not frame_paths:
+            _monitor(f"分析失败：视频无有效帧 video={video.filename} "
+                     f"size={os.path.getsize(video_path) / 1048576:.1f}MB 耗时={time.time() - _t0:.1f}s")
             return jsonify({"error": "视频无有效帧，请重新录制"}), 422
         selected = _select_frames(frame_paths)
-        print(
-            f"[pyfeat-gateway] 抽帧={len(frame_paths)} 分析帧={len(selected)}（上限 {MAX_ANALYZE_FRAMES}）",
-            flush=True,
+        _monitor(
+            f"抽帧={len(frame_paths)} 分析帧={len(selected)}（上限 {MAX_ANALYZE_FRAMES}） "
+            f"video={video.filename} size={os.path.getsize(video_path) / 1048576:.1f}MB"
         )
         with _INFER_LOCK:
             face_df = _detect_frames(_get_detector(), selected)
             if face_df.empty:
+                _monitor(f"分析失败：{len(selected)} 帧均未检测到人脸，"
+                         f"耗时={time.time() - _t0:.1f}s（若上方有单帧失败明细则为管线异常而非无人脸）")
                 return jsonify({"error": "未检测到人脸，请正对镜头重新录制"}), 422
             metrics = _build_metrics(face_df, len(selected))
+        _monitor(f"分析成功：有效人脸帧={len(face_df)}，耗时={time.time() - _t0:.1f}s")
         return jsonify({"metrics": metrics})
     except Exception as exc:
+        _monitor(f"分析异常：{type(exc).__name__}: {exc}，耗时={time.time() - _t0:.1f}s")
         app.logger.exception("[pyfeat-gateway] 视频分析异常")
         return jsonify({"error": f"py-feat 分析失败：{exc}"}), 500
     finally:

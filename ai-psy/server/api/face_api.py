@@ -5,6 +5,7 @@
 """
 import json
 import os
+import time
 import uuid
 
 from flask import Blueprint, current_app, jsonify, request
@@ -45,6 +46,8 @@ def _generate_report(metrics: dict) -> str:
             max_tokens=_REPORT_MAX_TOKENS,
         )
     except LLMError as exc:
+        # 监测日志：区分"视频分析失败"与"仅 AI 文字报告失败"两类报错来源
+        current_app.logger.warning("[face] AI 报告生成失败（指标不受影响）：%s", exc)
         return f"（AI 报告生成失败：{exc}）"
 
 
@@ -124,16 +127,26 @@ def analyze_face_video():
         return jsonify({"error": "仅支持 webm / mp4 / mov 视频"}), 400
     save_path = os.path.join(Config.UPLOAD_DIR, f"{uuid.uuid4().hex}{ext}")
     video.save(save_path)
+    # 监测日志：记录请求起点与分段耗时，报错时可定位卡在网关还是大模型
+    _t0 = time.time()
+    current_app.logger.info("[face] 分析请求开始 file=%s size=%.1fMB",
+                            video.filename, os.path.getsize(save_path) / 1048576)
 
     try:
         try:
             metrics = analyze_video(save_path)
         except FaceAnalysisError as exc:
+            current_app.logger.warning("[face] 网关分析失败（%.1fs）：%s", time.time() - _t0, exc)
             return jsonify({"error": f"视频分析失败：{exc}"}), 422
         except Exception as exc:
+            current_app.logger.exception("[face] py-feat 运行异常（%.1fs）", time.time() - _t0)
             return jsonify({"error": f"py-feat 运行异常：{exc}"}), 500
 
+        _t1 = time.time()
+        current_app.logger.info("[face] 网关指标完成（%.1fs），开始 AI 报告生成", _t1 - _t0)
         report = _generate_report(metrics)
+        current_app.logger.info("[face] 全流程完成：AI 报告 %.1fs，总耗时 %.1fs",
+                                time.time() - _t1, time.time() - _t0)
         user = get_session_user()
         if user:
             _archive_report(user, metrics, report)

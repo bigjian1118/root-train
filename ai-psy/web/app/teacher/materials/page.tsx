@@ -115,11 +115,12 @@ function MaterialsContent() {
 
   const upload = useMutation({
     mutationFn: async (payload: FormData) => {
-      const res = await apiFetch<Response>('/api/teacher/materials/upload', {
-        method: 'POST',
-        body: payload,
-      });
-      return res.json();
+      // apiFetch 已把响应体解析为 JSON 返回（并非 Response 对象）；
+      // FormData 不能手动设 Content-Type，multipart 边界由浏览器自动生成
+      return apiFetch<{ ok: boolean; material_id: string; title: string }>(
+        '/api/teacher/materials/upload',
+        { method: 'POST', body: payload },
+      );
     },
     onSuccess: () => {
       toast({ title: '素材上传成功', variant: 'success' });
@@ -153,9 +154,20 @@ function MaterialsContent() {
 
   const handleDownload = async (id: string) => {
     try {
-      const res = await apiFetch<Response>(
-        `/api/teacher/materials/${encodeURIComponent(id)}/download`,
-      );
+      // 下载返回二进制流，apiFetch 会按文本解析破坏内容，必须用原生 fetch 拿 Response
+      const res = await fetch(`/api/teacher/materials/${encodeURIComponent(id)}/download`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        let message = `下载失败（${res.status}）`;
+        try {
+          const data = (await res.json()) as { error?: string };
+          if (data.error) message = data.error;
+        } catch {
+          /* 非 JSON 错误体，保留状态码提示 */
+        }
+        throw new Error(message);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');

@@ -15,6 +15,12 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     app.config.from_object(config_object)
     app.json.ensure_ascii = False
 
+    # 监测日志：默认级别只显示 WARNING 及以上，放开到 INFO 使 [face] 等
+    # 分段耗时/失败原因日志能进入 api.log（便携版 启动.bat 重定向收集）
+    import logging
+
+    app.logger.setLevel(logging.INFO)
+
     db.init_app(app)
 
     _register_cors(app)
