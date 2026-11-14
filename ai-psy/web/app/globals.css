@@ -1129,6 +1129,16 @@
   .aic-btn-submit:hover:not(:disabled) {
     box-shadow: 0 12px 26px rgba(58, 155, 216, 0.3);
   }
+  .aic-btn-ghost {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(126, 200, 242, 0.5);
+    color: #3a9bd8;
+    box-shadow: 0 4px 12px rgba(58, 155, 216, 0.1);
+  }
+  .aic-btn-ghost:hover:not(:disabled) {
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(58, 155, 216, 0.2);
+  }
   .aic-loading-mask {
     position: fixed;
     inset: 0;
@@ -1821,6 +1831,77 @@
     margin-top: 16px;
   }
 
+  /* 整体状态结论卡颜色分级（report.css .verdict-text） */
+  .aic-verdict-text {
+    font-size: 15px;
+    line-height: 1.9;
+    font-weight: 600;
+  }
+  .aic-verdict-text.v-ok { color: #2f7d52; }
+  .aic-verdict-text.v-mid { color: #3a9bd8; }
+  .aic-verdict-text.v-warn { color: #b08a1e; }
+  .aic-verdict-text.v-bad { color: #c66a35; }
+
+  /* 历史记录列表（report.css .history-list / .h-item / .h-date / .h-score）；
+     flex: 0 0 auto 防止侧边栏（flex 列容器）在内容超高时压缩列表，导致滚动条消失、条目截断 */
+  .aic-report-history-list {
+    width: 100%;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 0 0 auto;
+    max-height: 210px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+    /* 轻量滚动条：贴合青色调（Chrome 用 ::-webkit-scrollbar，Firefox 用 scrollbar-*） */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(58, 155, 216, 0.35) transparent;
+  }
+  .aic-report-history-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  .aic-report-history-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .aic-report-history-list::-webkit-scrollbar-thumb {
+    background: rgba(58, 155, 216, 0.35);
+    border-radius: 3px;
+  }
+  .aic-report-history-list .h-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: #5b7688;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .aic-report-history-list .h-item:hover {
+    background: #fff;
+    transform: translateX(2px);
+  }
+  /* 当前查看报告对应的历史条目选中态：与悬停态同系（白底），仅加青色描边区分 */
+  .aic-report-history-list .h-item.active {
+    background: #fff;
+    border-color: rgba(58, 155, 216, 0.45);
+    color: #2b4a5e;
+  }
+  .aic-report-history-list .h-date { flex: 1; }
+  .aic-report-history-list .h-score { font-weight: 800; color: #3a9bd8; }
+  .aic-report-history-list .h-empty {
+    font-size: 12.5px;
+    color: #6c8494;
+    text-align: center;
+    padding: 10px 0;
+    list-style: none;
+  }
+
   /* 右内容区（report.css .report-main / h2 / h4 / .text-col）；
      Tailwind preflight 会重置标题字号字重，故显式补 font-weight */
   .aic-report-main {
@@ -1842,6 +1923,10 @@
     font-weight: 700;
     color: #5b7688;
     margin-bottom: 8px;
+  }
+  .hl-num {
+    color: var(--hl-num, #d9a520);
+    font-weight: 800;
   }
   /* 新增功能面板说明行：旧版无对应物，取 report.css 辅助说明口径（ink-soft 13px） */
   .aic-report-panel-desc {
@@ -3593,5 +3678,131 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ===== 教师端「学生专属测评报告」全屏两栏布局（本次版式重构新增，独立于旧 .aic-report-grid，不影响学生端报告页） ===== */
+.aic-rpt-full {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 100vh;
+}
+/* 左栏固定：占屏宽约 20%（下限 250px / 上限 340px），自身超长时内部滚动，页面滚动时保持不动 */
+.aic-rpt-side {
+  flex: 0 0 clamp(250px, 20%, 340px);
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 18px;
+  box-sizing: border-box;
+  border-radius: 0;
+}
+.aic-rpt-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px clamp(18px, 2.5vw, 40px) 44px;
+}
+.aic-rpt-titleline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.aic-rpt-titleline h1 {
+  font-size: 20px;
+  font-weight: 800;
+  color: #2b4a5e;
+  line-height: 1.4;
+}
+.aic-rpt-subline {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 13px;
+  color: #6c8494;
+}
+/* 统一卡片内边距：所有模块卡 = aic-glass（浅蓝底/22px 圆角） + 本类 */
+.aic-rpt-card {
+  padding: 18px 22px;
+}
+/* 因子条形图颜色分级图例 */
+.aic-rpt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #5b7688;
+}
+.aic-rpt-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+/* AI 解读通栏卡：蓝色装饰边线在卡片左侧，内部长文不再重复左边线 */
+.aic-rpt-ai {
+  border-left: 6px solid #3a9bd8;
+}
+.aic-rpt-ai .aic-report-text {
+  border-left: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+/* AI 卡底部统一免责温馨提示条（合并原独立求助提示区，消除重复） */
+.aic-rpt-notice-bar {
+  margin-top: 14px;
+  border-top: 1px dashed rgba(126, 200, 242, 0.55);
+  padding-top: 12px;
+  text-align: center;
+  color: #6c8494;
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.aic-rpt-notice-bar .aic-rpt-notice-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #2b4a5e;
+  margin-bottom: 4px;
+}
+/* 底部操作区：两按钮横向居中 */
+.aic-rpt-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px 0 4px;
+}
+@media (max-width: 960px) {
+  .aic-rpt-full {
+    flex-direction: column;
+  }
+  .aic-rpt-side {
+    position: static;
+    max-height: none;
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+@media print {
+  .aic-rpt-side,
+  .aic-rpt-actions,
+  .aic-rpt-titleline button {
+    display: none;
+  }
+  .aic-rpt-full {
+    display: block;
+  }
+  .aic-rpt-body {
+    padding: 0;
   }
 }

@@ -139,6 +139,16 @@ def _phone_taken(phone: str) -> bool:
     return False
 
 
+def _phone_taken_by_other(phone: str, self_uid: str) -> bool:
+    """个人中心改手机号查重（排除自己）：新号不得被其他学生/教师占用。"""
+    for model, id_column in ((Student, Student.student_id), (Teacher, Teacher.teacher_id)):
+        if db.session.execute(
+            select(id_column).where(model.phone == phone, id_column != self_uid)
+        ).scalar_one_or_none():
+            return True
+    return False
+
+
 @bp.post("/api/auth/register")
 def register():
     """注册：手机号 + 密码；账号仍由系统自动分配，作为备用登录方式。"""
@@ -317,11 +327,17 @@ def update_profile():
         return err
     data = request.get_json(silent=True) or {}
     name = str(data.get("name", "")).strip()
-    # 手机号已是登录凭据，个人中心只读；此处即使传入也不修改
+    # 手机号支持自助修改（修改后即成为新的登录凭据）；校验口径与注册一致：11 位 + 全局唯一（排除自己）
+    phone = str(data.get("phone", "")).strip()
     is_teacher = user.get("role") == _TEACHER_ROLE
 
     if not name:
         return jsonify({"error": "请填写姓名"}), 400
+    phone_err = validate_cn_phone(phone)
+    if phone_err:
+        return jsonify({"error": phone_err}), 400
+    if _phone_taken_by_other(phone, user["id"]):
+        return jsonify({"error": "该手机号已被其他账号使用"}), 409
 
     if is_teacher:
         raw_classes = data.get("classes")
@@ -359,8 +375,8 @@ def update_profile():
             ).scalars().all()
             old_names = [binding.class_id for binding in old_bindings]
             if row:
-                # teacher.class 冗余列 = 全部班级逗号拼接；手机号不可自助修改
-                row.name, row.class_ = name, ",".join(classes)
+                # teacher.class 冗余列 = 全部班级逗号拼接；手机号随资料一并更新
+                row.name, row.class_, row.phone = name, ",".join(classes), phone
             for binding in old_bindings:
                 db.session.delete(binding)
             now = now_ms()
@@ -384,7 +400,7 @@ def update_profile():
                 select(Student).where(Student.student_id == user["id"])
             ).scalar_one_or_none()
             if row:
-                row.name, row.class_ = name, clazz
+                row.name, row.class_, row.phone = name, clazz, phone
             new_classes = [clazz]
         db.session.commit()
     except SQLAlchemyError:

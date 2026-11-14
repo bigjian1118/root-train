@@ -114,7 +114,7 @@ function AuthPageInner() {
     if (nextPath) {
       return nextPath;
     }
-    return user.role === 'teacher' ? '/teacher/account' : '/';
+    return user.role === 'teacher' ? '/profile' : '/';
   };
 
   const switchMode = (next: AuthMode) => {

@@ -258,7 +258,7 @@ function HomeContent() {
   // 教师不使用师生共用首页，直接跳转个人中心
   useEffect(() => {
     if (user?.role === 'teacher') {
-      router.replace('/teacher/account');
+      router.replace('/profile');
     }
   }, [user?.role, router]);
 

@@ -250,6 +250,32 @@ def teacher_report_detail(report_id: str):
     })
 
 
+@bp.get("/api/teacher/student/<sid>/reports")
+def teacher_student_reports(sid: str):
+    """返回该学生所有 SCL-90 报告列表（按时间降序），供教师端报告页左栏历史记录使用。"""
+    user, err = require_teacher()
+    if err:
+        return err
+    authorized = _teacher_classes(user["id"])
+    student = db.session.get(Student, sid)
+    if not student:
+        return jsonify({"error": "学生不存在"}), 404
+    if student.class_ not in authorized:
+        return jsonify({"error": "无权查看该学生数据"}), 403
+
+    rows = db.session.execute(
+        select(Scl90TextReport)
+        .where(Scl90TextReport.student_id == sid)
+        .order_by(Scl90TextReport.submit_timestamp.desc())
+    ).scalars().all()
+
+    return jsonify({
+        "student_id": sid,
+        "student_name": student.name,
+        "reports": [_scl90_row_public(row) for row in rows],
+    })
+
+
 @bp.get("/api/teacher/student/<sid>/factor-history")
 def teacher_student_factor_history(sid: str):
     """返回该学生所有 SCL-90 报告的因子分（按时间升序），供折线图展示。"""
