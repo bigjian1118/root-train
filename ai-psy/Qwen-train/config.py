@@ -87,7 +87,7 @@ def scenario_output_dir(scenario: str) -> str:
     """某场景 LoRA 适配器输出目录（vLLM --enable-lora 直接加载此目录）"""
     return os.path.join(AUTODL_TMP, f"qwen25-7b-lora-{scenario}")
 
-# 网站场景化题库（prepare_dataset.py 生成；前端实际静态加载 static/data/question_bank.json，
+# 网站场景化题库（prepare_dataset.py 生成；前端实际静态加载 web/public/data/question_bank.json，
 # 数据盘这份为留档备份）
 QUESTION_BANK_FILE = os.path.join(DATASET_ROOT, "question_bank.json")
 

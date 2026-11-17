@@ -1,7 +1,7 @@
 # 「心晴」使用文档
 
 > AI+心理健康校园测评系统 · 部署、训练与使用总说明
-> 配套细分文档：`ai-psy/README.md`（系统工程主文档）、`ai-psy/rf/README.md`（随机森林模块）、`ai-psy/Qwen-train/README.md`（大模型微调模块）、`env-deployment/部署手册-新服务器实例.md`（分步部署手册）
+> 配套细分文档：`ai-psy/README.md`（系统工程主文档）、`ai-psy/rf/README.md`（随机森林模块）、`ai-psy/Qwen-train/README.md`（大模型微调模块）、`env-deployment/部署手册-新AutoDL实例.md`（分步部署手册）
 
 ---
 
@@ -215,7 +215,7 @@ root-train/
 ├── env-deployment/                # 服务器环境配置与部署资料
 │   ├── setup_qwen_env.sh          #   一键：推理/微调环境 + 基座
 │   ├── setup_pyfeat_env.sh        #   一键：后端环境 + 权重 + 初始化 + RF 训练
-│   └── 部署手册-新服务器实例.md    #   分步部署手册（含每步验证点）
+│   └── 部署手册-新AutoDL实例.md    #   分步部署手册（含每步验证点）
 ├── ai-psy/                        # 网站主项目（详见 ai-psy/README.md）
 │   ├── server/                    # Flask 后端：api/ services/ models/ Agent/RAG
 │   ├── web/                       # Next.js 前端（App Router + shadcn + ECharts）

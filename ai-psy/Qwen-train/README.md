@@ -59,7 +59,7 @@ ls /root/autodl-tmp/Qwen2.5-7B-Instruct/config.json   # 能列出即完整
 
 - **存放路径**：`{AUTODL_FS}/dataset/ai_chat/train.jsonl` + `val.jsonl`（9:1 切分，约 756 训练 / 84 验证）
 - **生成方式**：`python prepare_dataset.py`（同时生成 `dataset/question_bank.json` 题库留档；
-  该题库实际由前端 `static/data/question_bank.json` 加载，数据盘这份为备份）
+  该题库实际由前端 `web/public/data/question_bank.json` 加载，数据盘这份为备份）
 - **样本格式**：JSONL 每行一条对话，`messages` 字段为角色消息数组：
 
 ```json

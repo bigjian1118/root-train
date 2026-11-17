@@ -141,8 +141,7 @@ root-train/
 │   └── README.md               # 详细技术说明（接口清单 / 表结构 / 验收标准）
 ├── env-deployment/             # 环境初始化脚本（pyfeat_env / qwen_env）与部署手册
 ├── portable-windows/run/       # Windows 便携版启动、停止、初始化脚本与使用说明
-├── 使用文档.md                  # 快速上手与部署要点
-├── 部署手册-新AutoDL实例.md      # 分步部署手册（含每步验证点）
+├── 使用文档.md                  # 部署、训练与使用总说明（快速开始 + 常见问题）
 ├── 项目功能与AI运用.md           # 功能清单与 AI 能力说明
 └── README.md                   # 本文件
 ```
@@ -180,7 +179,7 @@ bash env-deployment/setup_qwen_env.sh all
 
 - 支持按阶段执行：`setup_pyfeat_env.sh env|feat|init`（环境/权重/初始化），`setup_qwen_env.sh env|model`（环境/基座下载）；
 - 可覆盖变量：`PROJ`（项目路径）、`PIP_MIRROR`（pip 镜像源）；
-- 权重下载失败可重跑续传；仓库根目录另有两份同名脚本副本，内容与 `env-deployment/` 一致，便于直接 `scp` 到服务器。
+- 权重下载失败可重跑续传；环境就绪后按 3.3 一键启动。
 
 ### 3.3 一键启动服务
 
@@ -267,9 +266,8 @@ PGPASSWORD=psy pg_restore -h 127.0.0.1 -U psy -d psy --clean --if-exists < backu
 |---|---|
 | [`ai-psy/README.md`](ai-psy/README.md) | 系统工程主文档：架构、目录、部署、配置、接口清单、数据库表结构、隐私与安全 |
 | [`ai-psy/USER_GUIDE.md`](ai-psy/USER_GUIDE.md) | 使用手册：功能操作、角色说明、常见问题 |
-| [`使用文档.md`](使用文档.md) | 快速上手与服务器部署要点 |
-| [`部署手册-新AutoDL实例.md`](部署手册-新AutoDL实例.md) | 分步部署手册（含每步验证点） |
-| [`env-deployment/部署手册-新AutoDL实例.md`](env-deployment/部署手册-新AutoDL实例.md) | 按 `env-deployment/` 目录结构组织的部署手册 |
+| [`使用文档.md`](使用文档.md) | 部署、训练与使用总说明：系统要求、4 步快速开始、功能入口、常见问题 |
+| [`env-deployment/部署手册-新AutoDL实例.md`](env-deployment/部署手册-新AutoDL实例.md) | 分步部署手册（含每步验证点），与 `env-deployment/` 脚本配套 |
 | [`项目功能与AI运用.md`](项目功能与AI运用.md) | 功能清单与 AI 能力说明 |
 | [`portable-windows/run/使用说明.txt`](portable-windows/run/使用说明.txt) | Windows 便携版使用说明 |
 | [`ai-psy/Qwen-train/README.md`](ai-psy/Qwen-train/README.md) | Qwen2.5-7B-Instruct QLoRA 微调工程 |
