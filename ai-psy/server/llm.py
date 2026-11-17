@@ -113,6 +113,72 @@ def chat(messages: list, temperature: float | None = None,
                            max_tokens=max_tokens, model=model).get("content", "")
 
 
+def chat_stream_with_tools(messages: list, tools: list | None = None,
+                           temperature: float | None = None,
+                           max_tokens: int | None = None,
+                           model: str | None = None):
+    """流式调用并兼容工具调用。
+
+    yield 两种事件：
+      ("delta", str)        正文增量，可直接下发给前端
+      ("tool_calls", list)  流结束时聚合出的完整工具调用列表
+    vLLM / OpenAI 兼容接口在 stream=true 下会把工具参数拆成多个分片，
+    这里按 index 聚合，保证 Agent 能边生成正文边处理工具调用。
+    """
+    if Config.LLM_PROVIDER == "mock":
+        yield "delta", _mock_reply(messages)
+        return
+
+    payload = {
+        "model": model or _provider()["model"],
+        "messages": messages,
+        "temperature": Config.LLM_TEMPERATURE if temperature is None else temperature,
+        "max_tokens": max_tokens or Config.LLM_MAX_TOKENS,
+        "stream": True,
+    }
+    _apply_extra_params(payload)
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"
+
+    pending: dict[int, dict] = {}
+    try:
+        with requests.post(_endpoint(), headers=_headers(), json=payload,
+                           timeout=Config.LLM_TIMEOUT, stream=True) as resp:
+            resp.raise_for_status()
+            for raw in resp.iter_lines(decode_unicode=True):
+                if not raw or not raw.startswith("data:"):
+                    continue
+                data = raw[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    delta = json.loads(data)["choices"][0]["delta"] or {}
+                except (ValueError, KeyError, IndexError):
+                    continue
+                content = delta.get("content") or ""
+                if content:
+                    yield "delta", content
+                for item in delta.get("tool_calls") or []:
+                    index = item.get("index", 0)
+                    slot = pending.setdefault(index, {
+                        "id": "", "type": "function",
+                        "function": {"name": "", "arguments": ""},
+                    })
+                    if item.get("id"):
+                        slot["id"] = item["id"]
+                    function = item.get("function") or {}
+                    if function.get("name"):
+                        slot["function"]["name"] = function["name"]
+                    if function.get("arguments"):
+                        slot["function"]["arguments"] += function["arguments"]
+    except Exception as exc:
+        raise LLMError(f"流式调用大模型失败：{exc}") from exc
+
+    if pending:
+        yield "tool_calls", [pending[index] for index in sorted(pending)]
+
+
 def chat_stream(messages: list, temperature: float | None = None,
                 max_tokens: int | None = None, model: str | None = None):
     """流式生成：逐段 yield 文本增量（SSE 打字机效果）。"""

@@ -7,6 +7,8 @@ models/
 uploads/
 backups/
 .env
+# 启动时自动生成的 session 签名密钥（不可入库/不可随包分发）
+data/.secret_key
 *.db
 __pycache__/
 *.pyc

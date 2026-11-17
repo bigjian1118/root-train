@@ -13,8 +13,10 @@ from server import create_app
 app = create_app()
 
 if __name__ == "__main__":
+    # 默认仅回环监听：前端统一经 Next 代理访问 /api，避免局域网绕过代理直连后端；
+    # 如需局域网直连后端，显式设置 HOST=0.0.0.0。
     app.run(
-        host=os.environ.get("HOST", "0.0.0.0"),
+        host=os.environ.get("HOST", "127.0.0.1"),
         port=int(os.environ.get("PORT", "6006")),
         debug=os.environ.get("FLASK_DEBUG", "0") == "1",
         threaded=True,

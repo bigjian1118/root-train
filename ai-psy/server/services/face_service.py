@@ -56,14 +56,25 @@ def analyze_video(video_path: str) -> dict:
             resp = requests.post(
                 url,
                 files={"video": (os.path.basename(video_path), fh)},
+                headers={"X-Gateway-Token": Config.PYFEAT_GATEWAY_TOKEN},
                 timeout=_PYFEAT_TIMEOUT_SECONDS,
             )
-        resp.raise_for_status()
-        data = resp.json()
     except requests.RequestException as exc:
-        raise FaceAnalysisError(f"无法连接视频分析服务：{exc}") from exc
+        # 不在用户可见文案中拼接异常原文，避免暴露内网网关地址与端口
+        raise FaceAnalysisError("无法连接视频分析服务，请稍后重试") from exc
+
+    if resp.status_code != 200:
+        # 网关的业务错误（如“未检测到人脸”）是面向用户的中文提示，可直接透出；其余统一为固定文案
+        try:
+            detail = resp.json().get("error")
+        except ValueError:
+            detail = None
+        raise FaceAnalysisError(detail or "视频分析服务返回异常，请稍后重试")
+
+    try:
+        data = resp.json()
     except ValueError as exc:  # 网关返回非 JSON 文本
-        raise FaceAnalysisError(f"视频分析服务返回非 JSON：{exc}") from exc
+        raise FaceAnalysisError("视频分析服务返回非 JSON") from exc
 
     # 兼容网关两种返回：直接给 metrics，或包一层 {"metrics": {...}}
     if isinstance(data, dict) and isinstance(data.get("metrics"), dict):

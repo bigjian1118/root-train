@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Flask 应用工厂：只暴露 /api/* 接口，页面由 Next.js 前端提供。"""
 import os
+import time
 
 from flask import Flask, jsonify, request
 from sqlalchemy import text
@@ -29,7 +30,23 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     _register_cli(app)
     _init_database(app)
     _start_material_ai_worker(app)
+    _init_report_task_worker(app)
+    _init_analysis_task_worker(app)
     return app
+
+
+def _init_analysis_task_worker(app: Flask) -> None:
+    """AI 综合报告异步任务线程池：与报告任务池隔离，互不阻塞。"""
+    from .services.analysis_tasks import init_analysis_worker
+
+    init_analysis_worker(app)
+
+
+def _init_report_task_worker(app: Flask) -> None:
+    """报告异步任务线程池：注入 app，任务线程靠它创建独立 app_context。"""
+    from .services.report_tasks import init_report_worker
+
+    init_report_worker(app)
 
 
 def _start_material_ai_worker(app: Flask) -> None:
@@ -96,7 +113,8 @@ def _register_cors(app: Flask) -> None:
 def _register_error_handlers(app: Flask) -> None:
     @app.errorhandler(413)
     def too_large(_exc):
-        return jsonify({"error": "上传文件超过 50MB 限制"}), 413
+        # 各接口上限不同（全局 50MB / 素材上传 100MB），文案不写死具体数值
+        return jsonify({"error": "上传文件过大，请压缩后重试"}), 413
 
     @app.errorhandler(404)
     def not_found(_exc):
@@ -138,6 +156,61 @@ def _init_database(app: Flask) -> None:
                 "source TEXT NOT NULL DEFAULT 'upload'"))
             db.session.execute(text(
                 "ALTER TABLE activity_material ADD COLUMN IF NOT EXISTS tags TEXT"))
+            # 报告异步生成：状态 / 失败原因 / 幂等键 / 完成时间；存量行默认 completed
+            for table in ("scl90_text_report", "video_face_report"):
+                db.session.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                    "status TEXT NOT NULL DEFAULT 'completed'"))
+                db.session.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS error_message TEXT"))
+                db.session.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS request_key TEXT"))
+                db.session.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS finished_at BIGINT"))
+                try:
+                    db.session.execute(text(
+                        f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{table}_student_request "
+                        f"ON {table} (student_id, request_key) WHERE request_key IS NOT NULL"))
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    app.logger.warning("[db] %s 幂等索引创建失败，将退化为应用层去重", table)
+            # 进程重启后，上次残留的 processing 任务已不可能恢复：统一标记失败，避免永久卡住
+            for table in ("scl90_text_report", "video_face_report"):
+                db.session.execute(text(
+                    f"UPDATE {table} SET status='failed', request_key=NULL, "
+                    "error_message='服务重启导致生成中断，请重新生成', "
+                    f"finished_at={int(time.time() * 1000)} WHERE status='processing'"))
+            # AI 综合报告：学生ID / 异步状态 / 失败原因 / 幂等键 / 完成时间 / 教师未读
+            for statement in (
+                "ALTER TABLE ai_analysis_report ADD COLUMN IF NOT EXISTS student_id TEXT",
+                "ALTER TABLE ai_analysis_report ADD COLUMN IF NOT EXISTS teacher_id TEXT",
+                "ALTER TABLE ai_analysis_report ADD COLUMN IF NOT EXISTS "
+                "status TEXT NOT NULL DEFAULT 'completed'",
+                "ALTER TABLE ai_analysis_report ADD COLUMN IF NOT EXISTS error_message TEXT",
+                "ALTER TABLE ai_analysis_report ADD COLUMN IF NOT EXISTS request_key TEXT",
+                "ALTER TABLE ai_analysis_report ADD COLUMN IF NOT EXISTS finished_at BIGINT",
+                "ALTER TABLE ai_analysis_report ADD COLUMN IF NOT EXISTS "
+                "teacher_read INTEGER NOT NULL DEFAULT 0",
+            ):
+                db.session.execute(text(statement))
+            try:
+                db.session.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_ai_analysis_report_student_id "
+                    "ON ai_analysis_report (student_id)"))
+                db.session.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_ai_analysis_report_teacher_id "
+                    "ON ai_analysis_report (teacher_id)"))
+                db.session.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_analysis_report_request "
+                    "ON ai_analysis_report (request_key) WHERE request_key IS NOT NULL"))
+            except SQLAlchemyError:
+                db.session.rollback()
+                app.logger.warning("[db] AI 综合报告幂等索引创建失败，将退化为应用层去重")
+            # 重启后无法续跑：标记失败但保留 request_key，避免同组合被重复自动触发
+            db.session.execute(text(
+                "UPDATE ai_analysis_report SET status='failed', "
+                "error_message='服务重启导致生成中断，请重新生成', "
+                f"finished_at={int(time.time() * 1000)} WHERE status='processing'"))
             db.session.commit()
 
             # 手机号是登录凭据：学生/教师各自唯一；用部分唯一索引兼容存量 NULL。

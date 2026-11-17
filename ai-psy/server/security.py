@@ -4,11 +4,12 @@
 保持与原 Flask 版本一致的行为：
   - session["user"] 结构不变（前端契约依赖）；
   - 学生/教师角色校验返回 (user, error_response)；
-  - ID 生成规则不变（时间戳 + 学号/工号 / 时间戳 + 随机数）。
+  - ID 生成规则：用户 ID = 时间戳 + 学号/工号；业务 ID = 随机 UUID。
 """
 import os
-import random
 import re
+import secrets
+import uuid
 from datetime import datetime
 
 from flask import jsonify, session
@@ -67,9 +68,10 @@ def validate_cn_phone(phone: str) -> str | None:
 
 
 def make_generated_account() -> str:
-    """生成候选账号：前缀 + 首位非 0 的纯数字随机串。"""
+    """生成候选账号：前缀 + 首位非 0 的纯数字随机串（用 secrets，避免被预测）。"""
     digits = "".join(
-        str(random.randint(0 if index else 1, 9)) for index in range(ACCOUNT_DIGITS)
+        secrets.choice("123456789" if index == 0 else "0123456789")
+        for index in range(ACCOUNT_DIGITS)
     )
     return f"{ACCOUNT_PREFIX}{digits}"
 
@@ -89,8 +91,12 @@ def make_user_id(user_no: str) -> str:
 
 
 def make_business_id() -> str:
-    """业务 ID（报告/预约/会话）：时间戳 + 4 位随机数。"""
-    return datetime.now().strftime("%Y%m%d%H%M%S") + f"{random.randint(0, 9999):04d}"
+    """业务 ID（报告/预约/会话/素材）：uuid4 hex。
+
+    旧实现是「时间戳 + 4 位随机数」，可枚举且并发下会撞主键；
+    改随机 UUID 后无法推测他人 ID，主键冲突概率可忽略（列类型均为 Text，无需改库）。
+    """
+    return uuid.uuid4().hex
 
 
 def validate_class_names(raw) -> tuple[list[str], str | None]:

@@ -12,12 +12,11 @@
 import json
 
 from .config import Config
-from .llm import chat_non_stream, chat_stream
+from .llm import chat_stream, chat_stream_with_tools
 from .prompt import AGENT_SYSTEM_SUFFIX, SCENARIOS
 from .tools import execute_tool, to_openai_tools
 
 _TOOL_RESULT_MAX_CHARS = 2000
-_SIMULATED_DELTA_CHARS = 40
 _HISTORY_ROLES = ("user", "assistant")
 
 
@@ -88,24 +87,29 @@ def run_agent(scenario: str, history: list[dict], user_text: str,
         tools = to_openai_tools()
         citations: list[dict] = []
         seen = set()
-        final_content = ""
+        answered = False
 
         yield "meta", {
             "scenario": scenario,
             "scenario_name": scenario_config["name"],
         }
 
-        # 工具决策轮：有 tool_calls 就执行并回填，直到模型给出最终回答或达到上限
+        # 工具决策轮：边流式生成正文边收集 tool_calls，有调用就执行并回填，
+        # 直到模型给出最终回答或达到上限。正文增量实时下发，不做二次切段。
         for _ in range(Config.AGENT_MAX_TOOL_ROUNDS):
-            message = chat_non_stream(messages, tools=tools)
-            tool_calls = message.get("tool_calls") or []
+            tool_calls: list = []
+            for kind, payload in chat_stream_with_tools(messages, tools=tools):
+                if kind == "delta":
+                    answered = True
+                    yield "delta", {"content": payload}
+                elif kind == "tool_calls":
+                    tool_calls = payload
             if not tool_calls:
-                final_content = (message.get("content") or "").strip()
                 break
 
             messages.append({
                 "role": "assistant",
-                "content": message.get("content") or "",
+                "content": "",
                 "tool_calls": tool_calls,
             })
             for call in tool_calls:
@@ -126,13 +130,8 @@ def run_agent(scenario: str, history: list[dict], user_text: str,
                     "content": result_text,
                 })
 
-        if final_content:
-            # 决策轮已产出完整回答：按 40 字一段模拟流式，保证前端体验一致
-            for start in range(0, len(final_content), _SIMULATED_DELTA_CHARS):
-                yield "delta", {
-                    "content": final_content[start:start + _SIMULATED_DELTA_CHARS]
-                }
-        else:
+        # 达到轮次上限仍是工具调用、或模型返回空正文时，补一次不带工具的流式生成
+        if not answered:
             for piece in chat_stream(messages):
                 if piece:
                     yield "delta", {"content": piece}

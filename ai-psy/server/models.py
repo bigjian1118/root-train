@@ -136,6 +136,12 @@ class Scl90TextReport(db.Model):
     psdi: Mapped[float | None] = mapped_column(Float)
     submit_timestamp: Mapped[int] = mapped_column(BigInteger, nullable=False)
     item_answers: Mapped[str | None] = mapped_column(Text)
+    # 异步生成状态：processing / completed / failed；存量行默认 completed（行为与旧版一致）
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="completed")
+    error_message: Mapped[str | None] = mapped_column(Text)
+    # 幂等键：同学生同场景同答案只建一个任务；失败时置空以便重新提交
+    request_key: Mapped[str | None] = mapped_column(Text)
+    finished_at: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class VideoFaceReport(db.Model):
@@ -149,6 +155,11 @@ class VideoFaceReport(db.Model):
     landmark_json: Mapped[str | None] = mapped_column(Text)
     prominent_dimension: Mapped[str | None] = mapped_column(Text)
     create_timestamp: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # 同 scl90_text_report：异步生成状态与幂等键
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="completed")
+    error_message: Mapped[str | None] = mapped_column(Text)
+    request_key: Mapped[str | None] = mapped_column(Text)
+    finished_at: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class AiAnalysisReport(db.Model):
@@ -159,10 +170,22 @@ class AiAnalysisReport(db.Model):
     student_class: Mapped[str | None] = mapped_column(Text)
     student_no: Mapped[str | None] = mapped_column(Text, index=True)
     phone: Mapped[str | None] = mapped_column(Text)
+    # 显式学生ID：存量行依赖 student_no 关联，综合报告统一按学生ID归档
+    student_id: Mapped[str | None] = mapped_column(Text, index=True)
+    # 归属教师：按学生所属班级的班主任写入，教师端可直接按任教关系校验权限
+    teacher_id: Mapped[str | None] = mapped_column(Text, index=True)
     text_report_id: Mapped[str | None] = mapped_column(Text, index=True)
     video_report_id: Mapped[str | None] = mapped_column(Text, index=True)
     ai_content: Mapped[str | None] = mapped_column(Text)
     create_timestamp: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # 综合报告异步状态：pending / processing / completed / failed；存量单报告解读默认 completed
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="completed", index=True)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    # 幂等键：同一学生同一文本+视频组合只生成一次综合报告
+    request_key: Mapped[str | None] = mapped_column(Text)
+    finished_at: Mapped[int | None] = mapped_column(BigInteger)
+    # 教师端未读标记：0 未读 / 1 已读（仅综合报告使用）
+    teacher_read: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class CounselingSlot(db.Model):

@@ -21,20 +21,38 @@ _MAX_PAGE_SIZE = 50
 _UPLOAD_PATH = "/api/teacher/materials/upload"
 MATERIAL_CATEGORIES = ("班会方案", "团体活动方案", "心理科普PPT", "其他")
 MATERIAL_EXTS = (".pdf", ".docx", ".pptx")
+# 素材入库是整块二进制（file_blob），必须有独立上限：既限制内存峰值也限制库体积
+MATERIAL_MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 
 @bp.before_request
-def _unlimited_upload_size():
-    """素材上传不受 50MB 限制：仅对该接口按请求解除上限，其他接口保持全局限制。
+def _limit_upload_size():
+    """素材上传使用独立上限（100MB）：仅对该接口放宽全局 50MB，其余接口保持全局限制。
 
     Werkzeug>=2.3 支持按请求覆盖 max_content_length；旧版本自动降级为全局上限。
     """
     if request.path == _UPLOAD_PATH:
         try:
-            request.max_content_length = None
+            request.max_content_length = MATERIAL_MAX_UPLOAD_BYTES
         except Exception:
             pass
     return None
+
+
+def _read_upload_limited(upload) -> bytes | None:
+    """分块读取上传文件，超过上限立即返回 None（避免一次性 read() 撑爆内存）。"""
+    chunks = []
+    total = 0
+    while True:
+        chunk = upload.stream.read(_UPLOAD_CHUNK_BYTES)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MATERIAL_MAX_UPLOAD_BYTES:
+            return None
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _teacher_name_map(teacher_ids: list[str]) -> dict[str, str]:
@@ -172,7 +190,9 @@ def upload_material():
         return jsonify({
             "error": f"仅支持 pdf / docx / pptx 格式，当前文件：{ext or '（无扩展名）'}"
         }), 400
-    file_blob = upload.read()
+    file_blob = _read_upload_limited(upload)
+    if file_blob is None:
+        return jsonify({"error": "文件过大，请上传 100MB 以内的 pdf / docx / pptx"}), 413
     if not file_blob:
         return jsonify({"error": "文件内容为空，请重新选择"}), 400
 

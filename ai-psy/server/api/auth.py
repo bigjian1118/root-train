@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from ..extensions import db
 from ..models import Student, Teacher, TeacherClass, now_ms
+from ..ratelimit import allow, clear, is_limited, record
 from ..security import (
     ACCOUNT_MAX_RETRY, MAX_TEACHER_CLASSES, build_password_hash,
     make_generated_account, make_user_id,
@@ -23,6 +24,18 @@ bp = Blueprint("auth", __name__)
 _CLASS_SEPARATOR_RE = re.compile(r"[,，、\n\r\t]")
 _STUDENT_ROLE = "student"
 _TEACHER_ROLE = "teacher"
+
+# 认证接口限流：登录按「账号失败次数 + 来源 IP 失败次数」双维度，注册按来源 IP 计数
+_LOGIN_FAILURE_LIMIT = 5
+_LOGIN_IP_FAILURE_LIMIT = 100
+_AUTH_WINDOW_SECONDS = 600
+_REGISTER_IP_LIMIT = 20
+
+
+def _client_ip() -> str:
+    """来源 IP：后端只监听回环，remote_addr 恒为 127.0.0.1，优先取 Next 代理注入的 X-Forwarded-For。"""
+    forwarded = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return forwarded or (request.remote_addr or "unknown")
 
 
 def _user_model(role: str):
@@ -152,6 +165,8 @@ def _phone_taken_by_other(phone: str, self_uid: str) -> bool:
 @bp.post("/api/auth/register")
 def register():
     """注册：手机号 + 密码；账号仍由系统自动分配，作为备用登录方式。"""
+    if not allow(f"register:{_client_ip()}", _REGISTER_IP_LIMIT, _AUTH_WINDOW_SECONDS):
+        return jsonify({"error": "注册请求过于频繁，请稍后再试"}), 429
     data = request.get_json(silent=True) or {}
     role = data.get("role")
     user_no = str(data.get("no", "")).strip()
@@ -201,9 +216,9 @@ def register():
     if db.session.execute(
         select(no_column).where(no_column == user_no)
     ).scalar_one_or_none():
-        return jsonify({"error": "该学号/工号已被注册"}), 409
+        return jsonify({"error": "该学号/工号或手机号已被使用，请更换后重试"}), 409
     if _phone_taken(phone):
-        return jsonify({"error": "该手机号已被注册"}), 409
+        return jsonify({"error": "该学号/工号或手机号已被使用，请更换后重试"}), 409
 
     # 账号自动分配：查重 + 唯一索引冲突重试，超限返回通用提示（不暴露生成逻辑）
     uid = make_user_id(user_no)
@@ -237,10 +252,10 @@ def register():
             if db.session.execute(
                 select(no_column).where(no_column == user_no)
             ).scalar_one_or_none():
-                return jsonify({"error": "该学号/工号已被注册"}), 409
+                return jsonify({"error": "该学号/工号或手机号已被使用，请更换后重试"}), 409
             # 手机号唯一索引冲突（并发注册同一号码）：直接返回，不再重试
             if _phone_taken(phone):
-                return jsonify({"error": "该手机号已被注册"}), 409
+                return jsonify({"error": "该学号/工号或手机号已被使用，请更换后重试"}), 409
             continue
         break
     else:
@@ -272,6 +287,14 @@ def login():
     if not identifier or not password:
         return jsonify({"error": "请填写手机号/账号和密码"}), 400
 
+    # 暴力破解防护：同一账号 10 分钟内失败 5 次即锁定，来源 IP 失败过多时整体限流
+    # key 截断到 64 字符，避免超长入参把限流表撑大
+    account_key = f"login:{identifier[:64]}"
+    ip_key = f"login-ip:{_client_ip()[:64]}"
+    if (is_limited(account_key, _LOGIN_FAILURE_LIMIT, _AUTH_WINDOW_SECONDS)
+            or is_limited(ip_key, _LOGIN_IP_FAILURE_LIMIT, _AUTH_WINDOW_SECONDS)):
+        return jsonify({"error": "尝试次数过多，请 10 分钟后再试"}), 429
+
     row = db.session.execute(
         select(model).where(
             or_(model.phone == identifier, model.account == identifier)
@@ -280,9 +303,14 @@ def login():
     # 账号注销功能：已注销账号禁止登录/找回。状态检查必须在密码校验之前——
     # 注销后密码已随机化，若先验密码只会得到笼统的"账号或密码错误"，不符合合规提示要求。
     if row is not None and getattr(row, "account_status", "active") == "deleted":
+        record(account_key)
+        record(ip_key)
         return jsonify({"error": "该账号已永久注销，无法使用"}), 403
     if not row or not verify_password(password, row.password):
+        record(account_key)
+        record(ip_key)
         return jsonify({"error": "手机号/账号或密码错误"}), 401
+    clear(account_key)
 
     if role == _TEACHER_ROLE:
         uid = row.teacher_id

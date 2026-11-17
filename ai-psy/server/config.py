@@ -4,13 +4,54 @@
 说明：模型权重常驻宿主机磁盘，服务通过 vLLM 端口访问，进程本身不加载大权重。
 """
 import os
+import secrets
+
+# 视为「已公开」的历史默认值：便携版整包分发，任何硬编码密钥都可被用来伪造 session
+_INSECURE_SECRET_KEYS = {
+    "",
+    "xinqing-dev-secret-key-change-in-prod",
+    "xinqing-portable-secret-change-me",
+    "change-me",
+}
+
+
+def _load_secret_key() -> str:
+    """SECRET_KEY 取值：环境变量（非弱值） > 本地密钥文件 > 生成随机密钥并落盘。
+
+    落盘位置默认 <项目根>/data/.secret_key，保证同一部署重启后登录态不失效；
+    首次升级到本策略时旧 session 会失效，用户重新登录一次即可。
+    """
+    env_key = os.environ.get("SECRET_KEY", "").strip()
+    if env_key and env_key not in _INSECURE_SECRET_KEYS:
+        return env_key
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    key_path = os.environ.get("SECRET_KEY_FILE") or os.path.join(root, "data", ".secret_key")
+    try:
+        with open(key_path, encoding="utf-8") as fh:
+            saved = fh.read().strip()
+        if len(saved) >= 32:
+            return saved
+    except OSError:
+        pass
+
+    key = secrets.token_hex(32)
+    try:
+        os.makedirs(os.path.dirname(key_path), exist_ok=True)
+        with open(key_path, "w", encoding="utf-8") as fh:
+            fh.write(key)
+        os.chmod(key_path, 0o600)
+    except OSError:
+        # 只读介质无法落盘时退化为进程内随机密钥：重启需重新登录，但安全强度不降低
+        pass
+    return key
 
 
 class Config:
     """Flask 配置基类。"""
 
     # ---------- 基础 ----------
-    SECRET_KEY = os.environ.get("SECRET_KEY", "xinqing-dev-secret-key-change-in-prod")
+    SECRET_KEY = _load_secret_key()
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024
     JSON_AS_ASCII = False
     SESSION_COOKIE_SAMESITE = "Lax"
@@ -36,7 +77,7 @@ class Config:
     LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
     LLM_TIMEOUT = int(os.environ.get("LLM_TIMEOUT", "120"))
 
-    # ---------- 无卡模式（AutoDL 无卡开机：GPU 模型服务不可用） ----------
+    # ---------- 无卡模式（无卡开机：GPU 模型服务不可用） ----------
     # AI_ENABLED=0 时禁用全部大模型/嵌入生成功能，其余业务功能照常可用；
     # start_all.sh 的无卡探测会自动注入该变量，也可手动覆盖。
     AI_ENABLED = os.environ.get("AI_ENABLED", "1") == "1"
@@ -66,6 +107,10 @@ class Config:
 
     # ---------- py-feat 视频分析网关 ----------
     PYFEAT_GATEWAY_URL = os.environ.get("PYFEAT_GATEWAY_URL", "http://127.0.0.1:8002")
+    # 网关为纯内网服务：绑定回环 + 共享密钥双重校验，默认值需与 pyfeat_gateway.py 保持一致
+    PYFEAT_GATEWAY_TOKEN = os.environ.get(
+        "PYFEAT_TOKEN", "xinqing-pyfeat-internal"
+    )
     UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "/data/uploads")
     UPLOAD_EXTENSIONS = (".webm", ".mp4", ".mov")
 

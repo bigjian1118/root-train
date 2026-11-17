@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, request, stream_with_context
 from ..agent import run_agent
 from ..ai_guard import ai_unavailable
 from ..prompt import SCENARIOS
-from ..security import get_session_user, reject_teacher
+from ..security import reject_teacher, require_login
 from ..sse import sse_event, sse_response
 
 bp = Blueprint("chat", __name__)
@@ -85,9 +85,12 @@ def _sse_stream(scenario: str, history: list[dict], user_text: str,
     return sse_response(stream_with_context(generate()))
 
 
-def _session_user_snapshot() -> dict | None:
-    user = get_session_user()
-    return dict(user) if user else None
+def _require_chat_user():
+    """聊天入口守卫：教师拒绝（沿用旧文案），且必须登录，防止匿名请求消耗计费大模型额度。"""
+    err = reject_teacher()
+    if err:
+        return None, err
+    return require_login()
 
 
 @bp.get("/api/chat/stream")
@@ -96,7 +99,7 @@ def chat_stream_get():
     err = ai_unavailable()
     if err:
         return err
-    err = reject_teacher()
+    user, err = _require_chat_user()
     if err:
         return err
     scenario, scenario_err = _resolve_scenario(request.args.get("scenario"))
@@ -106,7 +109,7 @@ def chat_stream_get():
     if not user_text:
         return _error("缺少用户消息")
     history = _parse_history_param(request.args.get("history"))
-    return _sse_stream(scenario, history, user_text, _session_user_snapshot())
+    return _sse_stream(scenario, history, user_text, user)
 
 
 @bp.post("/api/chat/stream")
@@ -115,7 +118,7 @@ def chat_stream_post():
     err = ai_unavailable()
     if err:
         return err
-    err = reject_teacher()
+    user, err = _require_chat_user()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -132,7 +135,7 @@ def chat_stream_post():
         user_text = user_text.strip()
     if not user_text:
         return _error("缺少用户消息")
-    return _sse_stream(scenario, history, user_text, _session_user_snapshot())
+    return _sse_stream(scenario, history, user_text, user)
 
 
 @bp.post("/api/chat")
@@ -141,7 +144,7 @@ def chat_compat():
     err = ai_unavailable()
     if err:
         return err
-    err = reject_teacher()
+    user, err = _require_chat_user()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -156,7 +159,7 @@ def chat_compat():
 
     reply_parts = []
     for event, payload in run_agent(
-        scenario, history, user_text, _session_user_snapshot()
+        scenario, history, user_text, user
     ):
         if event == "delta":
             reply_parts.append(str(payload.get("content") or ""))

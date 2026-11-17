@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """学生个人报告与视频检测报告接口：列表 / 详情 / 删除 / 教师查看本班视频报告。"""
 import json
+import time
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
 from ..extensions import db
@@ -12,6 +13,7 @@ from ..models import (
 from ..prompt import crowd_tag_to_scenario, scenario_display_name
 from ..scoring import FACTOR_EN_MAP, scores_from_report_row
 from ..security import require_login, require_teacher
+from ..services.report_tasks import ETA_SECONDS
 
 bp = Blueprint("report", __name__)
 
@@ -57,6 +59,9 @@ def _scl90_row_public(row: Scl90TextReport) -> dict:
         "top_factor": top_factor,
         "factor_avgs": factor_avgs,
         "created_at": (row.submit_timestamp // 1000) if row.submit_timestamp else None,
+        # 异步生成状态：processing 时列表只显示"生成中"，不提供详情入口
+        "status": row.status or "completed",
+        "error_message": row.error_message,
     }
 
 
@@ -107,6 +112,8 @@ def _video_row_public(video: VideoFaceReport, user_name: str | None,
         "au": metrics.get("au") or {},
         "emotions": metrics.get("emotions") or {},
         "dominant_emotion": metrics.get("dominant_emotion", ""),
+        "status": video.status or "completed",
+        "error_message": video.error_message,
         "created_at": (
             video.create_timestamp // 1000
         ) if video.create_timestamp else None,
@@ -144,6 +151,8 @@ def student_report_detail(report_id: str):
     ).scalar_one_or_none()
     if not row:
         return jsonify({"error": "报告不存在或不属于你"}), 404
+    if (row.status or "completed") != "completed":
+        return jsonify({"error": "报告生成中，请稍后再查看", "status": row.status}), 409
     scenario = crowd_tag_to_scenario(row.crowd_tag)
     return jsonify({
         "id": row.report_id,
@@ -210,6 +219,8 @@ def face_report_detail(report_id: str):
     if not row:
         return jsonify({"error": "报告不存在或不属于你"}), 404
     video, user_name = row
+    if (video.status or "completed") != "completed":
+        return jsonify({"error": "报告生成中，请稍后再查看", "status": video.status}), 409
     return jsonify(_video_row_public(
         video, user_name, _load_ai_content(video_report_id=video.video_report_id),
         with_metrics=True,
@@ -262,3 +273,82 @@ def face_report_delete(report_id: str):
     db.session.delete(row)
     db.session.commit()
     return jsonify({"ok": True})
+
+
+_STATUS_KIND_TEXT = "text"
+_STATUS_KIND_VIDEO = "video"
+
+
+def _status_item(kind: str, report_id: str, status: str | None,
+                 submitted_at: int | None, error: str | None) -> dict:
+    """状态单项：只含轻量字段、不含报告正文，支持前端高频轮询。"""
+    state = status or "completed"
+    eta = None
+    if state == "processing":
+        elapsed = max(0, int(time.time()) - int((submitted_at or 0) / 1000))
+        eta = max(5, ETA_SECONDS[kind] - elapsed)
+    return {
+        "report_id": report_id,
+        "kind": kind,
+        "status": state,
+        "submitted_at": submitted_at,
+        "eta_seconds": eta,
+        "error": error if state == "failed" else None,
+        "redirect": "/test/report" if state == "completed" else "",
+    }
+
+
+@bp.get("/api/report/status")
+def report_status():
+    """报告生成状态查询：带 report_id 查单条，不带则返回该学生最新文本/视频报告状态。"""
+    user, err = _require_student_reports()
+    if err:
+        return err
+    report_id = (request.args.get("report_id") or "").strip()
+    if report_id:
+        text_row = db.session.execute(
+            select(Scl90TextReport).where(
+                Scl90TextReport.report_id == report_id,
+                Scl90TextReport.student_id == user["id"],
+            )
+        ).scalar_one_or_none()
+        if text_row:
+            return jsonify(_status_item(
+                _STATUS_KIND_TEXT, text_row.report_id, text_row.status,
+                text_row.submit_timestamp, text_row.error_message,
+            ))
+        video_row = db.session.execute(
+            select(VideoFaceReport).where(
+                VideoFaceReport.video_report_id == report_id,
+                VideoFaceReport.student_id == user["id"],
+            )
+        ).scalar_one_or_none()
+        if video_row:
+            return jsonify(_status_item(
+                _STATUS_KIND_VIDEO, video_row.video_report_id, video_row.status,
+                video_row.create_timestamp, video_row.error_message,
+            ))
+        return jsonify({"error": "报告不存在"}), 404
+
+    text_row = db.session.execute(
+        select(Scl90TextReport)
+        .where(Scl90TextReport.student_id == user["id"])
+        .order_by(Scl90TextReport.submit_timestamp.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    video_row = db.session.execute(
+        select(VideoFaceReport)
+        .where(VideoFaceReport.student_id == user["id"])
+        .order_by(VideoFaceReport.create_timestamp.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    return jsonify({
+        "text": _status_item(
+            _STATUS_KIND_TEXT, text_row.report_id, text_row.status,
+            text_row.submit_timestamp, text_row.error_message,
+        ) if text_row else None,
+        "video": _status_item(
+            _STATUS_KIND_VIDEO, video_row.video_report_id, video_row.status,
+            video_row.create_timestamp, video_row.error_message,
+        ) if video_row else None,
+    })
