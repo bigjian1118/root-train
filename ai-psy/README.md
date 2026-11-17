@@ -6,6 +6,8 @@
 ![数据库](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-blue)
 ![模型](https://img.shields.io/badge/LLM-Qwen2.5--7B--Instruct%20%7C%20BGE--M3-blueviolet)
 
+> 仓库主页（项目总览、仓库目录结构、Windows 便携版、文档索引）见 [`../README.md`](../README.md)。
+
 ---
 
 ## 一、项目介绍
@@ -268,7 +270,7 @@ PGPASSWORD=psy pg_restore -h 127.0.0.1 -U psy -d psy --clean --if-exists < backu
 | 参赛组别 | 大二组 |
 | 团队成员 | 徐斌宸、王博奕、邓钰函 |
 | 联系方式 | 19305129575 |
-| 代码仓库 | https://github.com/bigjian1118/ai-psy |。
+| 代码仓库 | https://github.com/bigjian1118/root-train |
 
 ---
 
