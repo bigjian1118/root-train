@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { ApiError, getJson, postJson } from '@/lib/api';
+import { clearReportUnread, isReportUnread, subscribeReportUnread } from '@/lib/report-notice';
 import { cn, formatTimestamp } from '@/lib/utils';
 import { useAuthStore } from '@/store/use-auth-store';
 
@@ -205,6 +206,23 @@ function ProfileContent() {
   const isTeacher = profile?.role === 'teacher' || storeUser?.role === 'teacher';
   const unreadTotal = unreadQuery.data?.total ?? 0;
 
+  // 教师端 AI 综合报告红点：新报告生成后计数，进入学生详情页自动清除
+  const aiUnreadQuery = useQuery({
+    queryKey: ['teacher', 'ai-unread'],
+    queryFn: () => getJson<{ count: number }>('/api/teacher/ai/unread-count'),
+    enabled: isTeacher,
+    refetchOnMount: 'always',
+  });
+  const aiUnread = aiUnreadQuery.data?.count ?? 0;
+
+  // 「我的心理测试报告」新报告红点：报告生成完成后置位，点击入口即清除
+  const [reportUnread, setReportUnread] = useState(false);
+  useEffect(() => {
+    const sync = () => setReportUnread(isReportUnread());
+    sync();
+    return subscribeReportUnread(sync);
+  }, []);
+
   // 可选班级列表：进入编辑态才拉取（与原任教班级管理页同口径）
   const classOptionsQuery = useQuery({
     queryKey: ['teacher', 'class-options'],
@@ -360,11 +378,21 @@ function ProfileContent() {
             <Link href="/appointment" className="aic-nav-item">🗓️ 心理咨询预约</Link>
             <Link href="/articles" className="aic-nav-item">📖 心理科普文章</Link>
             {/* 入口改指学生版专属报告页（左右分栏新版）；原 /student/reports 列表页保留不删 */}
-            <Link href="/test/report" className="aic-nav-item">🗂️ 我的心理测试报告</Link>
+            <Link
+              href="/test/report"
+              className="aic-nav-item"
+              onClick={clearReportUnread}
+            >
+              🗂️ 我的心理测试报告
+              {reportUnread ? <span className="aic-nav-dot" aria-label="有新报告" /> : null}
+            </Link>
           </>
         ) : (
           <>
-            <Link href="/teacher/reports" className="aic-nav-item">🗂️ 班级测评报告</Link>
+            <Link href="/teacher/reports" className="aic-nav-item">
+              🗂️ 班级测评报告
+              {aiUnread > 0 ? <span className="aic-nav-dot" aria-label="有新AI综合报告" /> : null}
+            </Link>
             <Link href="/teacher/appointment" className="aic-nav-item">🗓️ 预约管理</Link>
             <Link href="/teacher/materials" className="aic-nav-item">📚 心理活动素材库</Link>
             <Link href="/teacher/articles" className="aic-nav-item">📰 心理推文</Link>

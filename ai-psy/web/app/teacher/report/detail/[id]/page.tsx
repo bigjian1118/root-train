@@ -3,7 +3,8 @@
 import { AlertTriangle, ArrowLeft, FileText, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
 import { AuthGuard } from '@/components/business/auth-guard';
 import { EmptyState } from '@/components/business/empty-state';
@@ -11,9 +12,11 @@ import { LoadingSkeleton } from '@/components/business/loading-skeleton';
 import { MarkdownText } from '@/components/business/markdown-text';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { ApiError, getJson } from '@/lib/api';
-import { CRISIS_HOTLINE } from '@/lib/scoring';
+import { ApiError, getJson, postJson } from '@/lib/api';
 import type {
+  AiAnalysisDetailResponse,
+  AiAnalysisStatusItem,
+  AiAnalysisStatusResponse,
   FaceReportDetail, TextReportDetail, TextReportSummary, VideoMetrics,
 } from '@/lib/types';
 import { formatTimestamp } from '@/lib/utils';
@@ -38,6 +41,16 @@ const EMOTION_CN: Record<string, string> = {
 };
 
 const EMOTION_ORDER = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'surprise'];
+
+// 综合报告同一份正文含「学生版 / 教师版」两段；教师端只展示专业版，避免与学生版重复
+const TEACHER_SECTION_MARK = '## 教师版';
+
+function pickTeacherSection(content: string): string {
+  const index = content.indexOf(TEACHER_SECTION_MARK);
+  return index >= 0
+    ? content.slice(index + TEACHER_SECTION_MARK.length).trim()
+    : content;
+}
 
 function factorPercent(avg: number): number {
   return Math.max(4, Math.min(100, ((avg - 1) / 4) * 100));
@@ -324,6 +337,56 @@ function ReportDetailContent() {
     enabled: Boolean(studentId),
   });
 
+  // AI 综合报告状态：生成中每 3s 同步一次，完成后拉取正文
+  const compositeStatusQuery = useQuery({
+    queryKey: ['teacher', 'ai-status', studentId],
+    queryFn: () => getJson<AiAnalysisStatusResponse>(
+      `/api/ai/status?student_id=${encodeURIComponent(studentId)}`,
+    ),
+    enabled: Boolean(studentId),
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (
+      (query.state.data?.items ?? []).some((item) => item.status === 'processing')
+        ? 3000
+        : false
+    ),
+  });
+  const latestComposite: AiAnalysisStatusItem | undefined = compositeStatusQuery.data?.items?.[0];
+  const compositeDetailQuery = useQuery({
+    queryKey: ['teacher', 'ai-composite-detail', latestComposite?.id],
+    queryFn: () => getJson<AiAnalysisDetailResponse>(
+      `/api/ai/analysis/${encodeURIComponent(String(latestComposite?.id))}`,
+    ),
+    enabled: Boolean(latestComposite?.id) && latestComposite?.status === 'completed',
+  });
+
+  // 教师进入学生详情页即视为已读，清除列表与侧边栏的综合报告红点
+  const queryClient = useQueryClient();
+  const markedReadFor = useRef('');
+  useEffect(() => {
+    if (!studentId || markedReadFor.current === studentId) {
+      return;
+    }
+    markedReadFor.current = studentId;
+    void postJson<{ ok: boolean }>('/api/teacher/ai/read', { student_id: studentId })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['teacher', 'ai-composites'] }))
+      .catch(() => undefined);
+  }, [studentId, queryClient]);
+
+  // 综合报告失败重跑：复用原归档行，不产生重复数据
+  const handleCompositeRetry = async () => {
+    if (!latestComposite) {
+      return;
+    }
+    try {
+      await postJson('/api/ai/analysis/retry', { report_id: latestComposite.id });
+      await compositeStatusQuery.refetch();
+      await compositeDetailQuery.refetch();
+    } catch {
+      await compositeStatusQuery.refetch();
+    }
+  };
+
   const faceReports = faceQuery.data?.reports ?? [];
   const latestFace = faceReports[0];
   const faceMetrics: VideoMetrics | undefined = latestFace?.metrics;
@@ -342,7 +405,6 @@ function ReportDetailContent() {
   const factors = scores
     ? Object.entries(scores.因子分 ?? {}).sort((a, b) => b[1].均分 - a[1].均分)
     : [];
-  const aiContent = detail?.ai_content || detail?.report || '';
 
   const history = historyQuery.data?.reports ?? [];
   const recent = history.slice(0, 8);
@@ -669,25 +731,71 @@ function ReportDetailContent() {
                 </section>
               )}
 
-              {/* AI 个性化解读（通栏单卡片，左侧蓝色装饰边线） */}
+              {/* AI 综合报告（文本 + 视频双模态）：双报告完成后后台自动生成，本班教师可查看 */}
               <section className="aic-glass aic-rpt-card aic-rpt-ai">
-                <h2 className="aic-report-h2">🤖 AI 个性化解读</h2>
-                {aiContent ? (
-                  <div className="aic-report-text">
-                    <MarkdownText content={aiContent} />
-                  </div>
-                ) : (
-                  <p style={{ color: '#8aa0b0' }}>暂无 AI 综合解读。</p>
-                )}
-
-                {/* 卡片底部统一免责温馨提示条（合并原独立求助提示区，消除重复内容） */}
-                <div className="aic-rpt-notice-bar">
-                  <p className="aic-rpt-notice-title">需要帮助时请及时求助</p>
-                  <p className="whitespace-pre-line">{CRISIS_HOTLINE}</p>
-                  <p>
-                    本报告由自评量表生成，不是医学诊断，也不能替代心理咨询或精神科评估。
-                    若该生近期持续感到痛苦、失眠或出现伤害自己的想法，请立即联系信任的老师、家人或专业机构。
+                <h2 className="aic-report-h2">🧩 AI 综合报告（双模态）</h2>
+                {compositeStatusQuery.isLoading ? (
+                  <LoadingSkeleton rows={2} />
+                ) : !latestComposite ? (
+                  <p style={{ color: '#8aa0b0' }}>
+                    该生尚未同时完成文本测评与视频检测，暂未生成综合报告。
                   </p>
+                ) : latestComposite.status === 'processing' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#3a9bd8' }}>
+                    <span
+                      className="aic-spinner"
+                      style={{ width: 16, height: 16, borderWidth: 2, margin: 0 }}
+                    />
+                    综合报告生成中，完成后会自动同步到班级报告体系。
+                  </div>
+                ) : latestComposite.status === 'failed' ? (
+                  <>
+                    <p style={{ color: '#b03a34', marginBottom: 8 }}>
+                      {latestComposite.error_message || '综合报告生成失败，可重新生成。'}
+                    </p>
+                    <button
+                      type="button"
+                      className="aic-btn aic-btn-primary"
+                      onClick={() => void handleCompositeRetry()}
+                    >
+                      重新生成
+                    </button>
+                  </>
+                ) : compositeDetailQuery.isLoading ? (
+                  <LoadingSkeleton rows={3} />
+                ) : compositeDetailQuery.data?.analysis ? (
+                  <>
+                    <div className="aic-report-text">
+                      <MarkdownText content={pickTeacherSection(compositeDetailQuery.data.analysis.ai_content)} />
+                    </div>
+                    <p style={{ fontSize: 12, color: '#8aa0b0', marginTop: 10 }}>
+                      生成时间：
+                      {formatTimestamp(
+                        compositeDetailQuery.data.analysis.finished_at
+                        ?? compositeDetailQuery.data.analysis.created_at,
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ color: '#8aa0b0' }}>
+                    综合报告内容加载失败，
+                    <button
+                      type="button"
+                      className="aic-btn aic-btn-ghost"
+                      style={{ padding: '2px 10px', marginLeft: 6 }}
+                      onClick={() => void compositeDetailQuery.refetch()}
+                    >
+                      重试
+                    </button>
+                  </p>
+                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+                  <Link
+                    href={`/teacher/intervention?student=${encodeURIComponent(studentId)}`}
+                    className="aic-btn aic-btn-ghost"
+                  >
+                    🤖 基于综合报告生成干预建议
+                  </Link>
                 </div>
               </section>
 

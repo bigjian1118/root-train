@@ -5,7 +5,7 @@ import { GraduationCap, Presentation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // 师生倾诉消息头像：系统内置图标区分身份（不调用真实上传头像）。
-// 教师=讲台图标+浅蓝底，学生=学士帽图标+浅绿底，与 AIC 色板一致。
+// 教师=讲台图标+浅蓝底，学生=学士帽图标+浅绿底，与全局色板一致。
 const ROLE_ICONS = {
   student: GraduationCap,
   teacher: Presentation,

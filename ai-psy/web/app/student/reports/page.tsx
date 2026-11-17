@@ -14,7 +14,7 @@ import {
   Video,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { AppShell } from '@/components/business/app-shell';
 import { AuthGuard } from '@/components/business/auth-guard';
@@ -37,9 +37,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
-import { ApiError, del, getJson } from '@/lib/api';
+import { ApiError, del, getJson, postJson } from '@/lib/api';
+import { clearReportUnread } from '@/lib/report-notice';
 import type {
   AiAnalysis,
+  AiAnalysisRetryResponse,
   AnalysesResponse,
   FaceReportDetail,
   FaceReportSummary,
@@ -52,6 +54,8 @@ import { formatTimestamp, formatShortDate } from '@/lib/utils';
 
 const PAGE_SIZE = 6;
 const STORAGE_LIST_LIMIT = 60;
+// 列表里存在生成中报告时的刷新间隔
+const LIST_POLL_MS = 8000;
 
 const SCENARIO_LABELS: Record<string, string> = {
   primary_student: '小学生',
@@ -101,6 +105,13 @@ function reportScenarioLabel(report: TextReportSummary): string {
 
 function hasCrisis(report: TextReportSummary): boolean {
   return Boolean(report.risk_signal ?? report.crisis);
+}
+
+/** 列表内是否仍有后台生成中的报告；用于决定是否继续轮询。 */
+function hasProcessing(items: { status?: string }[] | undefined): boolean {
+  return (items ?? []).some(
+    (item) => item.status === 'processing' || item.status === 'pending',
+  );
 }
 
 function TextDetailPanel({ reportId }: { reportId: string }) {
@@ -219,13 +230,22 @@ function TextReportCard({
 }) {
   const id = textId(report);
   const crisis = hasCrisis(report);
+  // 异步生成：未完成的报告不提供详情入口
+  const status = report.status ?? 'completed';
+  const locked = status !== 'completed';
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base">{reportScenarioLabel(report)}</CardTitle>
-            <Badge variant={crisis ? 'destructive' : 'success'}>{crisis ? '危机信号' : '平稳'}</Badge>
+            {status === 'processing' ? (
+              <Badge variant="info">生成中</Badge>
+            ) : status === 'failed' ? (
+              <Badge variant="destructive">生成失败</Badge>
+            ) : (
+              <Badge variant={crisis ? 'destructive' : 'success'}>{crisis ? '危机信号' : '平稳'}</Badge>
+            )}
           </div>
           <CardDescription className="mt-1 flex items-center gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" />
@@ -233,9 +253,9 @@ function TextReportCard({
           </CardDescription>
         </div>
         <div className="flex shrink-0 gap-1">
-          <Button variant="ghost" size="sm" onClick={onToggle}>
+          <Button variant="ghost" size="sm" onClick={onToggle} disabled={locked}>
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? '收起' : '详情'}
+            {status === 'processing' ? '生成中' : status === 'failed' ? '失败' : expanded ? '收起' : '详情'}
           </Button>
           <Button variant="ghost" size="sm" onClick={onDelete} disabled={!id} aria-label="删除报告">
             <Trash2 className="h-4 w-4 text-destructive" />
@@ -245,9 +265,13 @@ function TextReportCard({
       <CardContent>
         {/* 学生端不展示测试数据（得分/因子/占比），仅展示基本信息与危机状态 */}
         <p className="text-sm text-muted-foreground">
-          点击「详情」查看你的心理状态调适建议。
+          {status === 'processing'
+            ? '报告正在后台生成，完成后即可查看，您可以先去做其他事情。'
+            : status === 'failed'
+              ? (report.error_message || '报告生成失败，请重新完成一次测评。')
+              : '点击「详情」查看你的心理状态调适建议。'}
         </p>
-        {expanded && id ? <ExpandedPanel detailKey={`text:${id}`} /> : null}
+        {!locked && expanded && id ? <ExpandedPanel detailKey={`text:${id}`} /> : null}
       </CardContent>
     </Card>
   );
@@ -265,13 +289,20 @@ function VideoReportCard({
   onDelete: () => void;
 }) {
   const id = videoId(report);
+  // 异步生成：未完成的视频报告不提供详情入口
+  const status = report.status ?? 'completed';
+  const locked = status !== 'completed';
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base">视频状态检测</CardTitle>
-            {report.prominent_dimension || report.top_factor ? (
+            {status === 'processing' ? (
+              <Badge variant="info">生成中</Badge>
+            ) : status === 'failed' ? (
+              <Badge variant="destructive">生成失败</Badge>
+            ) : report.prominent_dimension || report.top_factor ? (
               <Badge variant="info">{report.prominent_dimension ?? report.top_factor}</Badge>
             ) : null}
           </div>
@@ -281,9 +312,9 @@ function VideoReportCard({
           </CardDescription>
         </div>
         <div className="flex shrink-0 gap-1">
-          <Button variant="ghost" size="sm" onClick={onToggle}>
+          <Button variant="ghost" size="sm" onClick={onToggle} disabled={locked}>
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? '收起' : '详情'}
+            {status === 'processing' ? '生成中' : status === 'failed' ? '失败' : expanded ? '收起' : '详情'}
           </Button>
           <Button variant="ghost" size="sm" onClick={onDelete} disabled={!id} aria-label="删除视频报告">
             <Trash2 className="h-4 w-4 text-destructive" />
@@ -292,8 +323,14 @@ function VideoReportCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {/* 学生端不展示表情占比数据，仅提示查看详情 */}
-        <p className="text-sm text-muted-foreground">点击「详情」查看视频状态解读与调整方向。</p>
-        {expanded && id ? <ExpandedPanel detailKey={`video:${id}`} /> : null}
+        <p className="text-sm text-muted-foreground">
+          {status === 'processing'
+            ? '视频报告正在后台生成，完成后即可查看。'
+            : status === 'failed'
+              ? (report.error_message || '视频分析失败，请重新录制一段视频。')
+              : '点击「详情」查看视频状态解读与调整方向。'}
+        </p>
+        {!locked && expanded && id ? <ExpandedPanel detailKey={`video:${id}`} /> : null}
       </CardContent>
     </Card>
   );
@@ -301,20 +338,30 @@ function VideoReportCard({
 
 function AiAnalysisCard({
   analysis,
-  expanded,
-  onToggle,
+  retrying,
+  onRetry,
 }: {
   analysis: AiAnalysis;
-  expanded: boolean;
-  onToggle: () => void;
+  retrying: boolean;
+  onRetry: () => void;
 }) {
+  const id = analysisId(analysis);
+  const status = analysis.status ?? 'completed';
+  const processing = status === 'processing' || status === 'pending';
+  const failed = status === 'failed';
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base">AI 综合分析</CardTitle>
-            <Badge variant="secondary">#{analysisId(analysis)}</Badge>
+            {processing ? (
+              <Badge variant="info">生成中</Badge>
+            ) : failed ? (
+              <Badge variant="destructive">生成失败</Badge>
+            ) : (
+              <Badge variant="success">已完成</Badge>
+            )}
           </div>
           <CardDescription className="mt-1 flex items-center gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" />
@@ -323,17 +370,38 @@ function AiAnalysisCard({
             {analysis.video_report_id ? ' · 关联视频报告' : ''}
           </CardDescription>
         </div>
-        <Button variant="ghost" size="sm" onClick={onToggle}>
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          {expanded ? '收起' : '展开'}
-        </Button>
+        {processing ? (
+          <Button variant="ghost" size="sm" disabled>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            生成中
+          </Button>
+        ) : failed ? (
+          // 失败兜底：复用原归档行重跑，不新增记录
+          <Button variant="ghost" size="sm" onClick={onRetry} disabled={retrying}>
+            {retrying ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            重新生成
+          </Button>
+        ) : (
+          <Link
+            href={`/student/reports/ai/${encodeURIComponent(id)}`}
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+          >
+            查看详情
+          </Link>
+        )}
       </CardHeader>
       <CardContent>
-        {expanded ? (
-          <MarkdownText content={analysis.ai_content} />
-        ) : (
-          <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{analysis.ai_content}</p>
-        )}
+        <p className="text-sm text-muted-foreground">
+          {processing
+            ? 'AI 综合报告正在后台生成，完成后可查看通俗版解读与调适建议。'
+            : failed
+              ? (analysis.error_message || '生成失败，可点击「重新生成」再次尝试。')
+              : '点击「查看详情」阅读双模态综合解读与调适建议。'}
+        </p>
       </CardContent>
     </Card>
   );
@@ -348,19 +416,52 @@ function ReportsContent() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [retryingAiId, setRetryingAiId] = useState('');
+  // 最后一份报告生成完成后，后端还需创建综合报告任务：
+  // 保留一小段轮询窗口，避免刚好错过创建瞬间而要重新进页面才看到
+  const [aiGracePoll, setAiGracePoll] = useState(false);
 
+  // 进入报告中心即视为已读，清除侧边栏新报告红点
+  useEffect(() => {
+    clearReportUnread();
+  }, []);
+
+  // 进入页面强制刷新，保证列表状态与后端一致；有生成中报告时继续轮询
   const textQuery = useQuery({
     queryKey: ['student', 'reports'],
     queryFn: () => getJson<ReportsResponse>('/api/student/reports'),
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (hasProcessing(query.state.data?.reports) ? LIST_POLL_MS : false),
   });
   const videoQuery = useQuery({
     queryKey: ['student', 'face-reports'],
     queryFn: () => getJson<FaceReportsResponse>('/api/face/reports'),
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (hasProcessing(query.state.data?.reports) ? LIST_POLL_MS : false),
   });
   const aiQuery = useQuery({
     queryKey: ['student', 'ai-analyses'],
     queryFn: () => getJson<AnalysesResponse>('/api/ai/analyses'),
+    // 进入页面强制刷新，保证与后端生成状态一致；
+    // 综合报告生成中、或双报告刚完成时继续轮询
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (
+      hasProcessing(query.state.data?.analyses) || aiGracePoll ? LIST_POLL_MS : false
+    ),
   });
+
+  // 双报告任一在生成 → 保持窗口；最后一份完成后延长 3 个轮询周期再停止
+  useEffect(() => {
+    if (!textQuery.data || !videoQuery.data) {
+      return;
+    }
+    if (hasProcessing(textQuery.data.reports) || hasProcessing(videoQuery.data.reports)) {
+      setAiGracePoll(true);
+      return;
+    }
+    const timer = setTimeout(() => setAiGracePoll(false), LIST_POLL_MS * 3);
+    return () => clearTimeout(timer);
+  }, [textQuery.data, videoQuery.data]);
 
   const textReports = (textQuery.data?.reports ?? []).slice(0, STORAGE_LIST_LIMIT);
   const videoReports = (videoQuery.data?.reports ?? []).slice(0, STORAGE_LIST_LIMIT);
@@ -403,6 +504,29 @@ function ReportsContent() {
       });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  /** 综合报告失败重跑：后端复用原归档行，前端只刷新状态 */
+  const handleRetryAnalysis = async (id: string) => {
+    if (!id) {
+      return;
+    }
+    setRetryingAiId(id);
+    try {
+      await postJson<AiAnalysisRetryResponse>('/api/ai/analysis/retry', {
+        report_id: Number(id),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['student', 'ai-analyses'] });
+      toast({ title: '已重新提交', description: 'AI 综合报告正在后台重新生成', variant: 'success' });
+    } catch (error) {
+      toast({
+        title: '重新生成失败',
+        description: error instanceof ApiError ? error.message : '网络异常，请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setRetryingAiId('');
     }
   };
 
@@ -540,8 +664,8 @@ function ReportsContent() {
       return (
         <EmptyState
           icon={<Sparkles className="h-5 w-5" />}
-          title="暂无 AI 综合分析"
-          description="当文字测评与视频状态报告都完成后，老师端可生成综合分析并同步给你。"
+          title="暂无 AI 综合报告"
+          description="完成文本测评与视频检测后，系统会自动生成 AI 综合报告，无需手动操作。"
         />
       );
     }
@@ -550,13 +674,12 @@ function ReportsContent() {
         <div className="space-y-3">
           {analyses.slice(0, visibleCount).map((analysis) => {
             const id = analysisId(analysis);
-            const key = `ai:${id}`;
             return (
               <AiAnalysisCard
-                key={key}
+                key={`ai:${id}`}
                 analysis={analysis}
-                expanded={expandedKey === key}
-                onToggle={() => toggleExpanded(key)}
+                retrying={retryingAiId === id}
+                onRetry={() => void handleRetryAnalysis(id)}
               />
             );
           })}

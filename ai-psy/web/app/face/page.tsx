@@ -1,48 +1,65 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 
 import { AppShell } from '@/components/business/app-shell';
 import { AuthGuard } from '@/components/business/auth-guard';
-import { MarkdownText } from '@/components/business/markdown-text';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldCheck } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { ApiError, postJson } from '@/lib/api';
-import type { VideoMetrics } from '@/lib/types';
+import { ApiError, getJson, postJson } from '@/lib/api';
+import { markReportUnread } from '@/lib/report-notice';
+import type { ReportStatusItem } from '@/lib/types';
 
 // 1:1 复刻旧版 static/face.html + face.css：居中标题 + 左窄栏操作 + 右深色取景框与结果玻璃卡；
-// 固定 10 秒录制、单次提交 webm、py-feat 轮询逻辑为已确认新增逻辑，保持不变。
+// 固定录制、单次提交 webm、py-feat 轮询逻辑为已确认新增逻辑，保持不变。
 
-const RECORD_SECONDS = 10;
-const EMOTION_CN: Record<string, string> = {
-  anger: '愤怒',
-  disgust: '厌恶',
-  fear: '恐惧',
-  happiness: '快乐',
-  sadness: '悲伤',
-  surprise: '惊讶',
+// 录制时长（秒）：按需求固定为 5 秒；文案、倒计时、自动停止都取自该常量
+const RECORD_SECONDS = 5;
+
+// 报告状态轮询间隔：与报告页保持一致，3s 足够感知完成
+const STATUS_POLL_MS = 3000;
+// 上传超时：视频仅 5 秒（约 1-3MB），正常 2s 内完成；
+// 超时后按"响应可能丢失"处理，回查后端是否已建档，避免代理抖动时误报失败
+const UPLOAD_TIMEOUT_MS = 30000;
+// 回查接管的时间窗口：只接管近期提交的报告，避免误认历史记录
+const RECENT_REPORT_WINDOW_MS = 10 * 60 * 1000;
+
+// 侧边栏“录制设置”选项：仅静态展示与本地选中态，不参与录制、上传与请求参数
+const DURATION_OPTIONS = ['5 秒', '10 秒', '15 秒'];
+const LIGHT_OPTIONS = ['自然光', '室内白光', '暖光'];
+const SHOT_OPTIONS = ['1 次', '2 次', '3 次'];
+
+type SetupRowProps = {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
 };
+
+/** 侧边栏设置行：纯展示，选中态只存本地 state，不进入后端契约。 */
+function SetupRow({ label, options, value, onChange }: SetupRowProps) {
+  return (
+    <div className="aic-setup-row">
+      <span className="aic-setup-label">{label}</span>
+      <div className="aic-setup-options">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={`aic-setup-option${option === value ? ' is-active' : ''}`}
+            onClick={() => onChange(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 const FACE_ERROR_HINT = '摄像头不可用，请确认已在 https 或 localhost 环境下授权。';
-
-/** 后端返回体；metrics 可能带 mock 标记，属页面局部契约，不扩展 lib/types。 */
-interface FaceAnalyzeResult {
-  metrics?: VideoMetrics & { mock?: boolean };
-  report?: string;
-}
-
-function percentText(value: number): string {
-  return `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%`;
-}
-
-function sortedEntries(values?: Record<string, number>): [string, number][] {
-  if (!values) {
-    return [];
-  }
-  return Object.entries(values)
-    .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
-    .sort((a, b) => b[1] - a[1]);
-}
 
 // 旧版倒计时格式 00:00:SS
 function countdownText(seconds: number): string {
@@ -50,72 +67,27 @@ function countdownText(seconds: number): string {
   return `00:00:${String(safe).padStart(2, '0')}`;
 }
 
-function MetricsPanel({
-  metrics,
-  report,
-}: {
-  metrics?: VideoMetrics & { mock?: boolean };
-  report?: string;
-}) {
-  const emotions = sortedEntries(metrics?.emotions);
-  const auEntries = metrics?.au
-    ? Object.entries(metrics.au).sort((a, b) => (b[1].mean ?? 0) - (a[1].mean ?? 0))
-    : [];
-
-  return (
-    <>
-      {report ? <div className="aic-report-text"><MarkdownText content={report} /></div> : null}
-
-      <h3>
-        主导情绪：
-        <span className="aic-dominant">
-          {EMOTION_CN[metrics?.dominant_emotion ?? ''] ?? metrics?.dominant_emotion ?? '-'}
-        </span>
-      </h3>
-
-      {emotions.length > 0 ? (
-        <div className="aic-bars">
-          <h4>基本情绪概率</h4>
-          {emotions.map(([key, value]) => (
-            <div key={key} className="aic-bar-row">
-              <span className="aic-bar-name">{EMOTION_CN[key] ?? key}</span>
-              <div className="aic-bar-track">
-                <div className="aic-bar-fill" style={{ width: percentText(value) }} />
-              </div>
-              <span className="aic-bar-val">{percentText(value)}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {auEntries.length > 0 ? (
-        <div className="aic-bars">
-          <h4>面部动作单元（AU）强度</h4>
-          {auEntries.slice(0, 8).map(([key, item]) => (
-            <div key={key} className="aic-bar-row">
-              <span className="aic-bar-name">
-                {key} {item.label ? `· ${item.label}` : ''}
-              </span>
-              <div className="aic-bar-track">
-                <div className="aic-bar-fill" style={{ width: percentText(item.mean ?? 0) }} />
-              </div>
-              <span className="aic-bar-val">{percentText(item.mean ?? 0)}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="aic-meta-line">
-        面部活跃度 {percentText(metrics?.face_activity ?? 0)} · 检出人脸帧{' '}
-        {metrics?.face_frames ?? 0} / {metrics?.total_frames ?? 0}
-        {metrics?.mock ? ' · MOCK 演示数据' : ''}
-      </div>
-      <p className="aic-est-tip">
-        以上指标由表情概率与面部活跃度估算，仅供参考，不构成医学诊断。
-      </p>
-    </>
-  );
+/**
+ * 上传失败后回查一次最新视频报告：
+ * 后端可能已建档并入队，但响应在代理链路上被重置（历史上 web.log 的 ECONNRESET），
+ * 此时直接接管该报告，避免用户看到"假失败"后又重复提交。
+ */
+async function probeLatestVideoReport(): Promise<string | null> {
+  try {
+    const latest = await getJson<{ video?: ReportStatusItem | null }>('/api/report/status');
+    const video = latest?.video;
+    if (!video?.report_id || !video.submitted_at) {
+      return null;
+    }
+    if (Date.now() - video.submitted_at > RECENT_REPORT_WINDOW_MS) {
+      return null;
+    }
+    return video.report_id;
+  } catch {
+    return null;
+  }
 }
+
 
 function FaceContent() {
   const { toast } = useToast();
@@ -129,11 +101,45 @@ function FaceContent() {
   const [cameraOn, setCameraOn] = useState(false);
   const [recording, setRecording] = useState(false);
   const [countdown, setCountdown] = useState(RECORD_SECONDS);
+  // 录制设置仅做静态展示：默认与真实录制口径保持一致（5 秒 / 自然光 / 1 次）
+  const [durationOption, setDurationOption] = useState(DURATION_OPTIONS[0]);
+  const [lightOption, setLightOption] = useState(LIGHT_OPTIONS[0]);
+  const [shotOption, setShotOption] = useState(SHOT_OPTIONS[0]);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<FaceAnalyzeResult | null>(null);
+  // 上传中 / 后台生成中 / 已完成 / 失败 四态都由这两个值推导
+  const [uploading, setUploading] = useState(false);
+  const [reportId, setReportId] = useState('');
   const [error, setError] = useState('');
+
+  // 报告在后端异步生成：本页只轮询状态，关闭页面或切换功能不会中断任务
+  const statusQuery = useQuery({
+    queryKey: ['student', 'face-report-status', reportId],
+    queryFn: () => getJson<ReportStatusItem>(
+      `/api/report/status?report_id=${encodeURIComponent(reportId)}`,
+    ),
+    enabled: Boolean(reportId),
+    refetchInterval: (query) => (
+      query.state.data?.status === 'processing' ? STATUS_POLL_MS : false
+    ),
+    refetchOnMount: 'always',
+  });
+  // 只有后端明确失败或报告已不存在才算失败；网络抖动继续按生成中轮询
+  const statusNotFound = statusQuery.error instanceof ApiError && statusQuery.error.status === 404;
+  const statusFailed = Boolean(reportId)
+    && (statusQuery.data?.status === 'failed' || statusNotFound);
+  const statusCompleted = Boolean(reportId) && statusQuery.data?.status === 'completed';
+  const statusProcessing = Boolean(reportId) && !statusFailed && !statusCompleted;
+  const failureReason = statusQuery.data?.error
+    || (statusQuery.error instanceof ApiError ? statusQuery.error.message : '')
+    || '视频分析未能完成，请重新录制一段。';
+
+  // 生成完成时点亮侧边栏「我的心理测试报告」红点
+  useEffect(() => {
+    if (statusCompleted) {
+      markReportUnread();
+    }
+  }, [statusCompleted]);
 
   const stopTimer = () => {
     if (timerRef.current !== null) {
@@ -217,7 +223,7 @@ function FaceContent() {
       : 'video/webm';
 
     chunksRef.current = [];
-    setResult(null);
+    setReportId('');
     releaseVideoUrl();
 
     const recorder = new MediaRecorder(streamRef.current, { mimeType });
@@ -261,32 +267,51 @@ function FaceContent() {
   };
 
   const handleAnalyze = async () => {
-    if (!videoBlob) {
+    if (!videoBlob || uploading) {
       return;
     }
-    setAnalyzing(true);
+    setUploading(true);
     setError('');
+    // 上传兜底超时：卡死的连接必须尽早断开，否则会一直停在"正在上传视频…"
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
     try {
       const form = new FormData();
       // 字段名与扩展名必须匹配后端白名单（video + webm）。
       form.append('video', videoBlob, 'face.webm');
-      const data = await postJson<FaceAnalyzeResult>('/api/face/analyze', form);
-      setResult(data);
-      toast({ title: '分析完成', description: '已生成面部状态解读', variant: 'success' });
+      // 上传即返回 {report_id, status: 'processing'}，分析与出报告在后台继续
+      const data = await postJson<{ report_id?: string; status?: string }>(
+        '/api/face/analyze',
+        form,
+        { signal: controller.signal },
+      );
+      if (!data.report_id) {
+        throw new Error('未获取到报告编号，请重新提交');
+      }
+      setReportId(data.report_id);
+      toast({ title: '已提交', description: '报告正在后台生成，可先离开此页面', variant: 'success' });
     } catch (caught) {
+      // 响应可能已丢失但后端已受理：接管最新报告，而不是直接报失败
+      const recoveredId = await probeLatestVideoReport();
+      if (recoveredId) {
+        setReportId(recoveredId);
+        toast({ title: '已提交', description: '报告正在后台生成，可先离开此页面', variant: 'success' });
+        return;
+      }
       const message =
         caught instanceof ApiError ? caught.message : '上传失败，请检查网络后重试。';
       setError(message);
-      toast({ title: '分析失败', description: message, variant: 'destructive' });
+      toast({ title: '提交失败', description: message, variant: 'destructive' });
     } finally {
-      setAnalyzing(false);
+      window.clearTimeout(timeoutId);
+      setUploading(false);
     }
   };
 
   const handleReset = () => {
     releaseVideoUrl();
     setVideoBlob(null);
-    setResult(null);
+    setReportId('');
     setError('');
     setCountdown(RECORD_SECONDS);
   };
@@ -341,11 +366,42 @@ function FaceContent() {
             </button>
           ) : null}
 
-          {analyzing ? (
+          {uploading ? (
+            <button type="button" className="aic-btn aic-btn-open" disabled>
+              正在上传视频…
+            </button>
+          ) : null}
+
+          {statusProcessing ? (
             <button type="button" className="aic-btn aic-btn-open" disabled>
               正在逐帧分析（约 1-3 分钟）
             </button>
           ) : null}
+
+          <hr className="aic-grad-divider" />
+
+          {/* 录制设置：静态展示，选择不改变录制参数与上传内容 */}
+          <div className="aic-setup">
+            <p className="aic-setup-title">录制设置</p>
+            <SetupRow
+              label="录制时长"
+              options={DURATION_OPTIONS}
+              value={durationOption}
+              onChange={setDurationOption}
+            />
+            <SetupRow
+              label="光线类型"
+              options={LIGHT_OPTIONS}
+              value={lightOption}
+              onChange={setLightOption}
+            />
+            <SetupRow
+              label="录制次数"
+              options={SHOT_OPTIONS}
+              value={shotOption}
+              onChange={setShotOption}
+            />
+          </div>
 
           <hr className="aic-grad-divider" />
 
@@ -387,7 +443,7 @@ function FaceContent() {
                 </div>
               ) : null}
             </div>
-            {videoBlob && !analyzing ? (
+            {videoBlob && !uploading && !statusProcessing ? (
               <div style={{ display: 'flex', gap: 12, marginTop: 14, justifyContent: 'center' }}>
                 <button type="button" className="aic-btn aic-btn-open" onClick={handleReset}>
                   再录一段
@@ -403,29 +459,56 @@ function FaceContent() {
             ) : null}
           </div>
 
-          {analyzing ? (
+          {/* 上传/生成中：只展示加载态与提示文案，不阻塞用户离开页面 */}
+          {uploading || statusProcessing ? (
             <section className="aic-glass aic-loading-panel">
               <div className="aic-spinner" style={{ margin: '0 auto 20px' }} />
               <p>
-                正在用 py-feat 逐帧分析你的面部表情…
+                {uploading ? '正在上传视频…' : '正在用 py-feat 逐帧分析你的面部表情…'}
                 <br />
-                <small>CPU 分析约需 1-3 分钟，请耐心等待</small>
+                <small>
+                  后台正在生成报告，您可关闭页面或切换其他功能，
+                  <br />
+                  生成完成后可在「我的心理测试报告」中查看。
+                  <br />
+                  文本与视频报告都完成后，AI 综合报告会自动在后台生成。
+                </small>
               </p>
             </section>
           ) : null}
 
-          {result ? (
+          {statusCompleted ? (
             <section className="aic-glass aic-result-panel">
-              <h2>分析报告</h2>
-              <MetricsPanel metrics={result.metrics} report={result.report} />
-              <button
-                type="button"
-                className="aic-btn aic-btn-open"
-                style={{ marginTop: 22, display: 'block', marginLeft: 'auto', marginRight: 'auto' }}
-                onClick={handleReset}
-              >
-                重新录制
-              </button>
+              <h2>✅ 报告已生成完成</h2>
+              <p className="aic-gen-text">
+                视频报告已生成完成，前往「我的心理测试报告」查看详情。
+                <br />
+                文本与视频报告都完成后，AI 综合报告会自动在后台生成，
+                完成后可在报告中心的「AI 综合分析」中查看。
+              </p>
+              <div className="aic-gen-actions">
+                <Link href="/test/report" className="aic-btn aic-btn-primary">
+                  查看报告 →
+                </Link>
+                <button type="button" className="aic-btn aic-btn-ghost" onClick={handleReset}>
+                  再录一段
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {statusFailed ? (
+            <section className="aic-glass aic-result-panel">
+              <h2>⚠️ 报告生成失败</h2>
+              <p className="aic-gen-text">
+                视频分析未完成，视频文件已按隐私要求删除，请重新录制一段再提交。
+              </p>
+              <div className="aic-gen-error">{failureReason}</div>
+              <div className="aic-gen-actions">
+                <button type="button" className="aic-btn aic-btn-primary" onClick={handleReset}>
+                  重新录制
+                </button>
+              </div>
             </section>
           ) : null}
         </section>

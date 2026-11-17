@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import DOMPurify from 'dompurify';
 
 import { AppShell } from '@/components/business/app-shell';
 import { AuthGuard } from '@/components/business/auth-guard';
@@ -44,6 +46,11 @@ function ArticleDetailContent() {
     enabled: Boolean(id),
   });
   const article = detailQuery.data?.article;
+  // 存储型 XSS 防护：正文 HTML 由教师端录入，落库前未清洗，渲染前统一做白名单过滤
+  const safeHtml = useMemo(() => {
+    const content = article?.content ?? '';
+    return isHtmlContent(content) ? DOMPurify.sanitize(content) : '';
+  }, [article?.content]);
   const is404 = detailQuery.error instanceof ApiError && detailQuery.error.status === 404;
 
   return (
@@ -92,10 +99,10 @@ function ArticleDetailContent() {
               </div>
             ) : null}
 
-            {isHtmlContent(article.content ?? '') ? (
+            {safeHtml ? (
               <article
                 className="aic-detail-content"
-                dangerouslySetInnerHTML={{ __html: article.content ?? '' }}
+                dangerouslySetInnerHTML={{ __html: safeHtml }}
               />
             ) : (
               <article className="aic-detail-content">

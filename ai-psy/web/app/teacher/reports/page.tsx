@@ -12,7 +12,7 @@ import { LoadingSkeleton } from '@/components/business/loading-skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getJson } from '@/lib/api';
-import type { TextReportSummary } from '@/lib/types';
+import type { TeacherCompositeItem, TeacherCompositesResponse, TextReportSummary } from '@/lib/types';
 import { formatTimestamp } from '@/lib/utils';
 
 const ALL_CLASSES = '';
@@ -26,6 +26,9 @@ const DAY_OPTIONS = [
 ];
 
 const SECONDS_PER_DAY = 86400;
+
+// AI 综合报告生成中的状态轮询间隔
+const LIST_POLL_MS = 8000;
 
 // 因子固定展示顺序（与旧版 teacher_reports.js FACTOR_ORDER / 后端 FACTOR_EN_MAP 一致）。
 const FACTOR_ORDER = [
@@ -312,6 +315,31 @@ function TeacherReportsContent() {
   const classes = classesQuery.data ?? [];
   const allReports = reportsQuery.data ?? [];
 
+  // AI 综合报告：与班级筛选联动；生成中的报告继续轮询，完成后自动出现状态
+  const compositesQuery = useQuery({
+    queryKey: ['teacher', 'ai-composites', classFilter],
+    queryFn: () => getJson<TeacherCompositesResponse>(
+      `/api/teacher/ai/composites${classFilter ? `?class=${encodeURIComponent(classFilter)}` : ''}`,
+    ),
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (
+      (query.state.data?.reports ?? []).some((item) => item.status === 'processing')
+        ? LIST_POLL_MS
+        : false
+    ),
+  });
+
+  // 每位学生只展示最新一条综合报告（接口已按创建时间倒序）
+  const compositeByStudent = useMemo(() => {
+    const map = new Map<string, TeacherCompositeItem>();
+    (compositesQuery.data?.reports ?? []).forEach((item) => {
+      if (item.student_id && !map.has(item.student_id)) {
+        map.set(item.student_id, item);
+      }
+    });
+    return map;
+  }, [compositesQuery.data]);
+
   // 天数 + 起止日期 + 关键字联合筛选，统计/图表/列表全部联动（旧版 applyFilter 口径）。
   const filteredReports = useMemo(() => {
     const keywordLower = keyword.trim().toLowerCase();
@@ -342,6 +370,37 @@ function TeacherReportsContent() {
   ];
 
   const classLabel = classFilter || (classes.length ? `全部班级（${classes.length}）` : '全部班级');
+
+  // AI 综合报告状态单元：无记录显示 —；生成中不可进入；完成后进入学生详情页查看专业版
+  const renderCompositeCell = (studentId: string, textReportId: string) => {
+    const item = compositeByStudent.get(studentId);
+    if (!item) {
+      return <span style={{ color: '#8aa0b0' }}>—</span>;
+    }
+    if (item.status === 'processing' || item.status === 'pending') {
+      return <span className="aic-tr-tag-status watch">生成中</span>;
+    }
+    if (item.status === 'failed') {
+      return <span className="aic-tr-tag-status focus">生成失败</span>;
+    }
+    return (
+      <button
+        type="button"
+        className="aic-tr-btn-view"
+        disabled={!textReportId}
+        title={item.risk ? '该生文本报告存在高风险信号，请优先查看' : undefined}
+        onClick={() =>
+          router.push(`/teacher/report/detail/${encodeURIComponent(textReportId)}`)
+        }
+      >
+        {item.risk ? (
+          <span style={{ color: '#d9534f', fontWeight: 600, marginRight: 4 }}>风险 ·</span>
+        ) : null}
+        查看
+        {item.teacher_read ? null : <span className="aic-nav-dot" aria-label="有新综合报告" />}
+      </button>
+    );
+  };
 
   const loadError = classesQuery.isError || reportsQuery.isError;
 
@@ -456,7 +515,7 @@ function TeacherReportsContent() {
           <thead>
             <tr>
               <th>学生姓名</th><th>测评场景</th><th>总分</th><th>阳性项目数</th>
-              <th>危机信号</th><th>状态</th><th>提交时间</th><th>操作</th>
+              <th>危机信号</th><th>状态</th><th>AI 综合报告</th><th>提交时间</th><th>操作</th>
             </tr>
           </thead>
         </table>
@@ -501,6 +560,9 @@ function TeacherReportsContent() {
                       >
                         {level === 'high' ? '重点关注' : level === 'watch' ? '需关注' : '正常'}
                       </span>
+                    </td>
+                    <td>
+                      {renderCompositeCell(report.student_id, id)}
                     </td>
                     <td><span className="aic-txt-hl">{formatTimestamp(report.created_at)}</span></td>
                     <td>

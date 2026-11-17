@@ -24,9 +24,8 @@ function TestContent() {
             <h3>SCL-90症状自评量表</h3>
             <div className="aic-scale-meta">
               <span className="aic-chip aic-chip-green">适用人群：高中生及大学生</span>
-              <span className="aic-chip aic-chip-gold">共 90 题</span>
             </div>
-            <p>适用于高中生及大学生，共90题，深度心理健康筛查。</p>
+            <p>适用于高中生及大学生，快速了解最近一周的心理健康状况。</p>
           </div>
           <span className="aic-scale-btn">点击进入 →</span>
         </Link>
