@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-训练素材与网站题库生成脚本（纯文本生成，Windows 本地与 AutoDL 均可运行）。
+训练素材与网站题库生成脚本（纯文本生成，Windows 本地与服务器均可运行）。
 
 【训练规则（2026-09 更新）】不再训练场景化文本测试 LoRA（三场景独立适配器已废弃，
 题目展示与计分全部在前端完成），本脚本仅生成：
@@ -9,7 +9,7 @@
   2. dataset/ai_chat/           —— AI 聊天通用微调数据库（三人群样本合并打乱 9:1 切分）
 
 目录规则（config.DATASET_ROOT 已做服务器 / 本地模拟服务器自适应）：
-  - AutoDL 真实服务器：/root/autodl-fs/dataset/（文件存储盘，持久保留）
+  - 真实服务器：/root/autodl-fs/dataset/（文件存储盘，持久保留）
   - 本地模拟服务器：项目同级 autodl-fs/dataset/（复刻服务器结构）
   - 不可写时（如纯本地开发）：回退脚本同级 output_dataset/
 
@@ -282,7 +282,7 @@ FACTOR_BRIEF = {
 def _resolve_dataset_root() -> str:
     """
     确定数据集根目录：直接使用 config.DATASET_ROOT（autodl-fs/dataset）。
-    config 已做自适应解析——真实 AutoDL 服务器指向 /root/autodl-fs/dataset，
+    config 已做自适应解析——真实服务器指向 /root/autodl-fs/dataset，
     本地模拟服务器指向项目同级 autodl-fs/dataset；
     若目录不可创建 / 不可写（如纯本地开发无数据盘），回退脚本同级 output_dataset/。
     """

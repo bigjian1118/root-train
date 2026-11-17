@@ -1,7 +1,7 @@
-# 「芯心向荣 AIC」使用文档
+# 「心晴」使用文档
 
 > AI+心理健康校园测评系统 · 部署、训练与使用总说明
-> 配套细分文档：`ai-psy/README.md`（系统工程主文档）、`ai-psy/rf/README.md`（随机森林模块）、`ai-psy/Qwen-train/README.md`（大模型微调模块）、`env-deployment/部署手册-新AutoDL实例.md`（分步部署手册）
+> 配套细分文档：`ai-psy/README.md`（系统工程主文档）、`ai-psy/rf/README.md`（随机森林模块）、`ai-psy/Qwen-train/README.md`（大模型微调模块）、`env-deployment/部署手册-新服务器实例.md`（分步部署手册）
 
 ---
 
@@ -26,7 +26,7 @@
 
 | 项目 | 要求 |
 |---|---|
-| 部署平台 | AutoDL 容器（Ubuntu + Miniconda 社区镜像），区域任选 |
+| 部署平台 | 云服务器 / 容器实例（Ubuntu + Miniconda），区域任选 |
 | GPU（推理/训练） | 单卡 RTX 4090 / 4090D 24GB；无卡实例可降级运行（AI 功能显示占位提示，测评/视频分析/预约等全部可用） |
 | 内存 | ≥ 32GB |
 | 磁盘 | 系统盘存代码；`/root/autodl-tmp` ≥ 30GB（基座+适配器）；`/root/autodl-fs` ≥ 1GB（数据库/模型/数据集，实例释放不丢失） |
@@ -41,7 +41,7 @@
 把 `ai-psy/` 与 `env-deployment/` 上传到服务器（环境脚本保持 `env-deployment/` 目录结构）：
 
 ```powershell
-# 本地 Windows PowerShell（端口/地址以 AutoDL 控制台为准）
+# 本地 Windows PowerShell（端口/地址以服务器控制台 / SSH 登录指令为准）
 scp -P <端口> -r ai-psy root@<地址>:~/ai-psy
 scp -P <端口> -r env-deployment root@<地址>:~/env-deployment
 ```
@@ -74,7 +74,7 @@ cd ~/ai-psy && ./start_all.sh start      # 依次拉起 PG → 主模型 → BGE
 ./start_all.sh init                      # 首次部署：建表 + 重建 RAG 索引（需先 start）
 ```
 
-脚本默认后端 6007、前端 6006——AutoDL 自定义服务只映射 6006，前端必须占这个端口（见 6.2-23）。端口可覆盖：
+脚本默认后端 6007、前端 6006——反向代理入口通常只映射 6006，前端必须占这个端口（见 6.2-23）。端口可覆盖：
 
 ```bash
 API_PORT=6006 WEB_PORT=3000 ./start_all.sh start
@@ -118,7 +118,7 @@ curl http://127.0.0.1:8002/health          # 视频网关正常（detector_loade
 
 主模型参数中 `--enable-auto-tool-choice --tool-call-parser hermes` 是 Agent 四工具循环的前置条件，缺失时 vLLM 会拒绝带 `tools` 的请求（见第六章第 11 条）。`--max-model-len 8192` 必须保留：显存 24G 下默认 32k 上下文装不进 KV cache（见 6.2-15）。
 
-浏览器访问 AutoDL 控制台「自定义服务」给出的地址（固定映射 6006，即前端），注册账号（手机号 + 密码）即可使用全部功能。
+浏览器访问反向代理入口给出的地址（固定映射 6006，即前端），注册账号（手机号 + 密码）即可使用全部功能。
 
 ### 第 5 步：清空业务数据（演示前重置，可选）
 
@@ -215,7 +215,7 @@ root-train/
 ├── env-deployment/                # 服务器环境配置与部署资料
 │   ├── setup_qwen_env.sh          #   一键：推理/微调环境 + 基座
 │   ├── setup_pyfeat_env.sh        #   一键：后端环境 + 权重 + 初始化 + RF 训练
-│   └── 部署手册-新AutoDL实例.md    #   分步部署手册（含每步验证点）
+│   └── 部署手册-新服务器实例.md    #   分步部署手册（含每步验证点）
 ├── ai-psy/                        # 网站主项目（详见 ai-psy/README.md）
 │   ├── server/                    # Flask 后端：api/ services/ models/ Agent/RAG
 │   ├── web/                       # Next.js 前端（App Router + shadcn + ECharts）
@@ -252,7 +252,7 @@ root-train/
 | 6 | `ModuleNotFoundError: No module named 'sqlalchemy'` | `pyfeat_env` 只装了 py-feat 依赖，后端依赖未装 | 见 6.2-6 |
 | 7 | `reindex-rag` 报 8001 `Connection refused` | BGE-M3 嵌入服务未启动 | 见 6.2-7 |
 | 8 | 任意接口报 5432 `Connection refused` | 实例重启后 PostgreSQL 未自启 | 见 6.2-8 |
-| 9 | vLLM 报 `Failed to infer device type` / 横幅 `GPU: No devices were found` | 实例处于 AutoDL「无卡模式」 | 见 6.2-9 |
+| 9 | vLLM 报 `Failed to infer device type` / 横幅 `GPU: No devices were found` | 实例处于无卡模式（未挂载 GPU） | 见 6.2-9 |
 | 10 | 调用模型返回 404 `model not found` | `--served-model-name` 与 `.env` 模型名不一致 | 见 6.2-10 |
 | 11 | Agent 带工具请求被 vLLM 拒绝 | 未开启自动工具选择与解析器 | 见 6.2-11 |
 | 12 | 用 `LLM_PROVIDER=mock` 重建索引后聊天也变假回答 | 该开关同时作用于 LLM 与嵌入 | 见 6.2-12 |
@@ -266,7 +266,7 @@ root-train/
 | 20 | 隧道工具填 3000→3000 报「不能相同否则冲突」，填 3000→6006 报「每个套接字地址只允许使用一次」，填 3001→3000 报 `Port forwarding for '127.0.0.1' port '3000' failed to start` | 工具要求两端端口都空闲（它会在本机与实例两侧各起监听）；3000 已被 Next 占用 | 见 6.2-20 |
 | 21 | 视频分析失败：`无法连接视频分析服务… port=8002 … Connection refused` | py-feat 网关进程未启动（重构后旧 `feat_analyzer.py` 已删除，网关由 `pyfeat_gateway.py` 提供） | 见 6.2-21 |
 | 22 | `-bash: ss: command not found` | 镜像未装 `iproute2`，`ss`/`netstat`/`lsof` 均不可用 | 见 6.2-22 |
-| 23 | 用 AutoDL 自定义服务打开网页报「无法访问/连接被拒绝」 | 该入口只映射容器 **6006**，而 6006 是 Flask，前端在 3000 | 见 6.2-23 |
+| 23 | 用反向代理入口打开网页报「无法访问/连接被拒绝」 | 该入口只映射容器 **6006**，而 6006 是 Flask，前端在 3000 | 见 6.2-23 |
 | 24 | `./start_all.sh` 报 `Permission denied` 或 `$'\r': command not found` | Windows 上传丢了可执行位 / 文件是 CRLF 换行 | 见 6.2-24 |
 | 25 | 视频分析失败：网关 `500`，traceback 为 `ValueError: No objects to concatenate`，其上有 `0it [00:00, ?it/s]` | py-feat 用 av 的 `stream.frames` 取总帧数，webm（matroska）该字段恒为 0，`VideoDataset` 长度为 0，`pd.concat` 空列表才炸 | 见 6.2-25 |
 | 26 | 视频测试报 500，网关进度条长时间不结束（如 `125/4976`） | CPU 推理约 3.8s/帧，默认抽帧过密导致超过后端 120s 读超时 | 见 6.2-26 |
@@ -421,10 +421,10 @@ BACKEND_URL=http://127.0.0.1:6007 node node_modules/next/dist/bin/next start -p 
 注意：`.next` 必须在构建成功前删除，否则 `next start` 会报找不到生产构建；另外跨平台上传 `node_modules` / `package-lock.json` 容易带入平台专用二进制冲突，**部署到服务器一律重装依赖**，不要随代码上传。
 
 **19. 打开 6006 显示 `{"error":"接口不存在"}`**
-Flask 只注册 `/api/*`，根路径 `/` 一律返回该 JSON，说明后端其实是健康的，只是你打开的是后端入口而不是前端。前端 Next 默认在 3000；AutoDL 自定义服务固定映射 6006，因此有两种做法：本机 `ssh -L` 把 3000 转出来（见 6.2-20），或把前端挪到 6006、后端退到 6007（见 6.2-23）。端口职责：3000 前端、6006 后端/平台入口、8000 主模型、8001 嵌入、8002 py-feat 网关。
+Flask 只注册 `/api/*`，根路径 `/` 一律返回该 JSON，说明后端其实是健康的，只是你打开的是后端入口而不是前端。前端 Next 默认在 3000；反向代理入口固定映射 6006，因此有两种做法：本机 `ssh -L` 把 3000 转出来（见 6.2-20），或把前端挪到 6006、后端退到 6007（见 6.2-23）。端口职责：3000 前端、6006 后端/平台入口、8000 主模型、8001 嵌入、8002 py-feat 网关。
 
 **20. 隧道工具无法访问 3000**
-AutoDL 隧道工具的两条硬限制：**「代理到本地端口」与「代理到远程端口」不能相同**（填 3000→3000 会弹「不能相同否则冲突」）；**本地端口同一时间只能被一个监听占用**（填 3000→6006 会弹 Windows 错误「通常每个套接字地址(协议/网络地址/端口)只允许使用一次」，即本地 3000 已被上一次的代理仍在占用）。按以下顺序处理：
+平台隧道/代理工具的两条硬限制：**「代理到本地端口」与「代理到远程端口」不能相同**（填 3000→3000 会弹「不能相同否则冲突」）；**本地端口同一时间只能被一个监听占用**（填 3000→6006 会弹 Windows 错误「通常每个套接字地址(协议/网络地址/端口)只允许使用一次」，即本地 3000 已被上一次的代理仍在占用）。按以下顺序处理：
 
 1. 先在工具里点「停止代理」，确认下方状态不再显示「代理中」；仍报占用说明是本机上一个残留监听，换端口最简单。
 2. 重新填一组**不冲突且语义正确**的映射：**代理到本地端口 `3001`、代理到远程端口 `3000`**（本地≠远程，满足工具约束；浏览器访问 `http://127.0.0.1:3001` 即为服务器前端 3000）。
@@ -432,13 +432,13 @@ AutoDL 隧道工具的两条硬限制：**「代理到本地端口」与「代�
 
 命令行方案（本地已有 OpenSSH，PowerShell 执行，保持窗口不关）：
 ```powershell
-ssh -p 26691 root@connect.cqa1.seetacloud.com `
+ssh -p <端口> root@<服务器地址> `
   -L 127.0.0.1:3001:127.0.0.1:3000 `
   -L 127.0.0.1:6006:127.0.0.1:6006 -N
 ```
 端口与主机以实例当前 SSH 登录指令为准。之后浏览器访问 `http://127.0.0.1:3001`（前端），后端仍可直接 `curl http://127.0.0.1:6006/api/health`。
 
-AutoDL 控制台方案：把「自定义服务」端口设为 **3000**，用控制台给出的公网地址访问前端。
+平台控制台方案：把「自定义服务」入口端口设为 **3000**，用控制台给出的公网地址访问前端。
 
 注意：本地端口与远程端口互换（如本地 3000 映到远程 3001）不是等价转发，远程并没有监听 3001，访问会失败，不要这样填。
 
@@ -449,7 +449,7 @@ AutoDL 控制台方案：把「自定义服务」端口设为 **3000**，用控�
 curl -s -o /dev/null -w '3000=%{http_code}\n' http://127.0.0.1:3000   # 200/404 = 被 Next 占用
 curl -s -o /dev/null -w '6006=%{http_code}\n' http://127.0.0.1:6006   # 200 = Flask 在跑
 ```
-若 3000 确实被 node 占用，就别再用这个工具暴露前端（它抢不到该端口），改用上面的 `ssh -L`（`-L` 只在本机起监听，远程 3000 只是转发目标，不要求空闲）或 AutoDL 控制台自定义服务；若 3000 空着，说明前端进程没起，先按第 4 步「终端 5」把 Next 拉起来再试。
+若 3000 确实被 node 占用，就别再用这个工具暴露前端（它抢不到该端口），改用上面的 `ssh -L`（`-L` 只在本机起监听，远程 3000 只是转发目标，不要求空闲）或平台控制台的自定义服务入口；若 3000 空着，说明前端进程没起，先按第 4 步「终端 5」把 Next 拉起来再试。
 
 **21. 视频分析失败：8002 Connection refused**
 `POST /api/face/analyze` 的后端链路是「Flask 6006 → py-feat 网关 8002 → 聚合指标 → 大模型生成报告」。重构时旧的 `feat_analyzer.py` 已删除，网关改由项目根目录的 `pyfeat_gateway.py` 独立进程提供，**未启动时后端必然报 8002 拒绝连接**。启动与验证：
@@ -463,7 +463,7 @@ curl http://127.0.0.1:8002/health
 
 排障顺序：
 1. 先确认 8002 进程在跑（`ps aux | grep pyfeat_gateway`），再确认 `.env` 的 `PYFEAT_GATEWAY_URL` 未被改成别的地址/端口。用 6.2-22 的探活脚本可一眼看出：正常部署时 3000/6006/8000/8001 均「监听中」，只有 8002「未监听」就是本条故障。
-2. 报 `No such file or directory ... July4_AU*_XGB.ubj`：py-feat 权重未预置，执行 `bash ~/env-deployment/setup_pyfeat_env.sh feat` 补齐离线权重（需先 `source /etc/network_turbo`）。
+2. 报 `No such file or directory ... July4_AU*_XGB.ubj`：py-feat 权重未预置，执行 `bash ~/env-deployment/setup_pyfeat_env.sh feat` 补齐离线权重（需可访问 GitHub 的网络）。
 3. 报 `ModuleNotFoundError: No module named 'feat'`：网关必须在 `pyfeat_env` 里启动（`conda activate pyfeat_env`），不要在 `qwen_env` 或系统 python 里跑。
 4. 报 `未上传视频文件` / `仅支持 webm / mp4 / mov`：网关契约是 multipart 字段 `video`，由前端 `FormData.append('video', blob)` 发起，不是 JSON 接口。
 5. 只想先验收其他功能、暂不做视频分析：可在 `.env` 设 `LLM_PROVIDER=mock` 让后端返回示例指标（注意该开关同时影响聊天与嵌入，验收完务必改回 `vllm` 并重建索引，见 6.2-12）。
@@ -509,7 +509,7 @@ apt update && apt install -y iproute2 net-tools
 端口职责对照：3000 前端 Next、6006 Flask、8000 主模型、8001 BGE-M3、8002 py-feat 网关。
 
 **23. 自定义服务打开是「无法访问 / 连接被拒绝」**
-AutoDL「自定义服务」只把容器 **6006** 暴露到公网，入口地址形如 `https://xxx.autodl.com:端口`。当前 6006 是 Flask（根路径返回 `{"error":"接口不存在"}`），前端 Next 在 3000，所以直接用该入口一定打不开前端；实例重启/换卡后入口地址还会变，用旧链接则表现为「连接被拒绝」。
+平台「自定义服务」只把容器 **6006** 暴露到公网，入口地址形如 `https://<平台域名>:端口`（以控制台给出的地址为准）。当前 6006 是 Flask（根路径返回 `{"error":"接口不存在"}`），前端 Next 在 3000，所以直接用该入口一定打不开前端；实例重启/换卡后入口地址还会变，用旧链接则表现为「连接被拒绝」。
 
 处理顺序：
 1. 先回控制台重新点「自定义服务」，复制**当前**地址再试。地址过期是最常见的「拒绝连接」原因，零改动。
@@ -619,7 +619,7 @@ PYFEAT_SKIP_FRAMES=5  ./start_all.sh restart  # 60 帧，更细但可能超时
 排查要点：
 - 重启前先看网关是否还在跑旧的长任务，`restart` 会按进程特征清理 `pyfeat_gateway.py`，但**已开始的单次分析不会被中断**，必要时 `pkill -f pyfeat_gateway.py` 后再起。
 - 后端读超时已从 120s 放宽到 `PYFEAT_TIMEOUT_SECONDS`（默认 300s，`start_all.sh` 已透传）。30 帧 × 3.8s ≈ 114s 原本正好卡在 120s 临界线上，是真会偶发 500 的原因。
-- 若机器更慢，可把 `PYFEAT_MAX_FRAMES` 调小（如 15）换取更短等待；调大超时意义有限，Next 与 AutoDL 反向代理也有各自的等待上限。
+- 若机器更慢，可把 `PYFEAT_MAX_FRAMES` 调小（如 15）换取更短等待；调大超时意义有限，Next 与反向代理也有各自的等待上限。
 - 若返回 422 而日志无异常，是「未检测到人脸」，属业务正常分支（光线不足、人脸太小、镜头偏移），换正对镜头重录即可。
 
 ---

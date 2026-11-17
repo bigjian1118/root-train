@@ -2,7 +2,7 @@
 """通用 PostgreSQL 数据库操作工具（基于 psycopg 3，适配本项目 psy 库）。
 
 与项目环境对齐：
-  - 数据库：PostgreSQL 16 + pgvector（AutoDL 上由 start_all.sh 启动，端口 5432）
+  - 数据库：PostgreSQL 16 + pgvector（由 start_all.sh 启动，端口 5432）
   - 驱动：psycopg 3（requirements.txt 已含，装在 API_ENV 对应 conda 环境）
   - 连接配置：优先读环境变量 DATABASE_URL（与 server/config.py 同源），
     未设置时回退项目默认 postgresql+psycopg://psy:psy@127.0.0.1:5432/psy
@@ -20,7 +20,7 @@
     python postgres_db_tool.py query "SELECT * FROM student WHERE class = %s" 计算机2101
     python postgres_db_tool.py exec "UPDATE student SET phone = %s WHERE student_id = %s" 13800000000 S001
 
-一键脚本入口（AutoDL，服务启动后可用）：
+一键脚本入口（服务启动后可用）：
     bash start_all.sh db query "SELECT count(*) AS n FROM student"
     bash start_all.sh db exec "UPDATE student SET phone = %s WHERE student_id = %s" 13800000000 S001
 

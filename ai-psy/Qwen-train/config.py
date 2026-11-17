@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Qwen2.5-7B-Instruct QLoRA 指令微调 - 集中配置（AutoDL 单卡 RTX4090D 24G）
+Qwen2.5-7B-Instruct QLoRA 指令微调 - 集中配置（单卡 RTX4090D 24G）
 
 技术路线（当前生效：bf16 原版基座 + 4bit NF4 标准 QLoRA）：
   - 基座：Qwen2.5-7B-Instruct（bf16 原版），由下方 _LOCAL_BASE_CANDIDATES 优先匹配
@@ -15,7 +15,7 @@ Qwen2.5-7B-Instruct QLoRA 指令微调 - 集中配置（AutoDL 单卡 RTX4090D 2
 import os
 
 # ==================== 〇、数据盘根目录自适应解析 ====================
-# 真实 AutoDL 服务器：数据盘为 /root/autodl-tmp（高速盘，放模型/适配器）
+# 真实服务器：数据盘为 /root/autodl-tmp（高速盘，放模型/适配器）
 #                     与 /root/autodl-fs（文件存储盘，放训练数据集，持久保留）；
 # 本地模拟服务器：项目同级目录下存在 autodl-tmp/、autodl-fs/ 文件夹（复刻服务器结构），
 # 此时自动回退到本地模拟路径，保证同一份代码两端可直接运行。
@@ -41,7 +41,7 @@ else:
     AUTODL_FS = _REAL_AUTODL_FS
 
 # ==================== 一、环境变量（必须在 import transformers 之前设置） ====================
-# HuggingFace 模型缓存目录：AutoDL 数据盘（或本地模拟数据盘），避免占用系统盘
+# HuggingFace 模型缓存目录：服务器数据盘（或本地模拟数据盘），避免占用系统盘
 os.environ["HF_HOME"] = os.path.join(AUTODL_TMP, "huggingface")
 # 国内镜像加速下载
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")

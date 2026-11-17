@@ -63,7 +63,7 @@ do_env() {
   log "pyfeat_env 环境配置完成"
 }
 
-# ---------- feat：预置 py-feat 离线权重（GitHub Releases，需学术加速） ----------
+# ---------- feat：预置 py-feat 离线权重（GitHub Releases，需可访问 GitHub 的网络） ----------
 do_feat() {
   conda activate pyfeat_env
   RES="$(python -c 'import feat; print(feat.__path__[0])')/resources"
@@ -84,10 +84,10 @@ do_feat() {
   for d in Upperscalar Upperpca Lowerscalar Lowerpca Fullscalar Fullpca; do
     files+=("$GH_P/all_data_${d}_June30.pkl")
   done
-  log "下载 py-feat 权重 ${#files[@]} 个到 $RES（GitHub 直连失败请先 source /etc/network_turbo）"
+  log "下载 py-feat 权重 ${#files[@]} 个到 $RES（GitHub 直连失败请改走可访问 GitHub 的网络/代理）"
   for u in "${files[@]}"; do
     f="$RES/$(basename "$u")"
-    [ -s "$f" ] || wget -q -O "$f" "$u" || fail "权重下载失败：$u（执行 source /etc/network_turbo 后重跑本阶段）"
+    [ -s "$f" ] || wget -q -O "$f" "$u" || fail "权重下载失败：$u（配置好网络/代理后重跑本阶段）"
   done
   conda deactivate
   log "feat 阶段完成：权重已离线预置，Detector 不再联网"

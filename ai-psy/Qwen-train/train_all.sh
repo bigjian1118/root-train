@@ -16,7 +16,7 @@ cd "$(dirname "$0")"
 # ==================== 参数配置区（按需修改） ====================
 # --- 运行环境 ---
 CONDA_ENV="qwen_env"                                     # 训练用 conda 环境
-CONDA_PROFILE="/root/miniconda3/etc/profile.d/conda.sh"  # AutoDL 默认 conda 初始化路径
+CONDA_PROFILE="/root/miniconda3/etc/profile.d/conda.sh"  # 服务器默认 conda 初始化路径
 
 # --- 可经 CLI 覆盖的训练参数（与 train_qlora.py 实际支持的参数一一对应；
 #     默认值与 config.py 完全一致，不改动时训练行为与原命令相同） ---
@@ -68,7 +68,7 @@ TRAIN_DEPS=("peft==0.13.2" "trl==0.12.0" "bitsandbytes==0.45.0" "accelerate==1.1
 if ! python -c "import peft, trl, bitsandbytes, accelerate, datasets" 2>/dev/null; then
   echo "[提示] 检测到缺少 QLoRA 训练依赖，自动补装：${TRAIN_DEPS[*]}"
   pip install "${TRAIN_DEPS[@]}" || {
-    echo "[错误] 依赖自动补装失败（多为网络问题），可先 source /etc/network_turbo 后重跑本脚本"
+    echo "[错误] 依赖自动补装失败（多为网络问题），可配置好 pip 镜像/网络后重跑本脚本"
     exit 1
   }
 fi

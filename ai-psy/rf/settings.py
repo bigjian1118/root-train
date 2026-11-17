@@ -8,7 +8,7 @@
 """
 import os
 
-# AutoDL 文件盘（与旧 config.AUTODL_FS 判定顺序一致，保证训练产物路径不变）
+# 文件盘（与旧 config.AUTODL_FS 判定顺序一致，保证训练产物路径不变）
 _REAL_AUTODL_FS = "/root/autodl-fs"
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ai-psy 目录
 _MOCK_AUTODL_FS = os.path.join(os.path.dirname(_PROJECT_ROOT), "autodl-fs")

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键启动 / 停止「芯心向荣 AIC」全部服务（AutoDL 单机部署，不使用容器）
+# 一键启动 / 停止「心晴」全部服务（Linux 服务器直启，不使用容器）
 #
 # 启动顺序：PostgreSQL → vLLM 主模型(8000) → BGE-M3(8001) → py-feat 网关(8002)
 #           → Flask(API_PORT) → Next(WEB_PORT)
@@ -18,7 +18,7 @@
 #         ./start_all.sh db exec "UPDATE student SET phone = %s WHERE student_id = %s" 13800000000 S001
 #         ./start_all.sh db demo
 #
-# 端口约定：6006 给前端，因为 AutoDL「自定义服务」只映射 6006；后端退到 6007。
+# 端口约定：6006 给前端，因为反向代理入口通常只映射 6006；后端退到 6007。
 # 全部可用同名环境变量覆盖，例如 API_PORT=6006 WEB_PORT=3000 ./start_all.sh start
 set -u
 
@@ -50,7 +50,7 @@ API_PORT="${API_PORT:-6007}"
 WEB_PORT="${WEB_PORT:-6006}"
 PYFEAT_PORT="${PYFEAT_PORT:-8002}"
 # 网关改为 ffmpeg 抽帧 + 逐帧检测：10 秒视频按 2fps 抽 20 帧，降采样到上限 10 帧，
-# CPU 约 1.5~3.8s/帧，总计约 20~30s，稳落在 AutoDL 反向代理 60s 掐线内
+# CPU 约 1.5~3.8s/帧，总计约 20~30s，稳落在反向代理 60s 掐线内
 PYFEAT_MAX_FRAMES="${PYFEAT_MAX_FRAMES:-10}"
 LLM_PORT="${LLM_PORT:-8000}"
 EMBED_PORT="${EMBED_PORT:-8001}"
@@ -112,7 +112,7 @@ wait_http() {
   return 1
 }
 
-# 无卡模式探测：AutoDL 无卡开机时没有 GPU，vLLM/BGE-M3 无法启动。
+# 无卡模式探测：服务器无卡开机时没有 GPU，vLLM/BGE-M3 无法启动。
 # 默认自动探测 nvidia-smi；CARDLESS=1 可手动强制无卡，CARDLESS=0 强制按有卡启动。
 is_cardless() {
   if [ -n "${CARDLESS:-}" ]; then
@@ -200,9 +200,10 @@ start_gateway() {
 
 start_api() {
   if port_up "$API_PORT"; then ok "Flask 已在运行（:$API_PORT）"; return 0; fi
-  info "启动 Flask 后端（:$API_PORT）"
+  info "启动 Flask 后端（:$API_PORT，仅回环监听）"
   # 必须用裸 python：conda activate 之后 PATH 里的 python 才是装了 Flask 的那个
-  start_bg api "$API_ENV" "$ROOT" env "PORT=$API_PORT" \
+  # HOST=127.0.0.1：前端统一经 Next 代理访问，禁止从局域网绕过代理直连后端
+  start_bg api "$API_ENV" "$ROOT" env "PORT=$API_PORT" "HOST=127.0.0.1" \
     "PYFEAT_TIMEOUT_SECONDS=${PYFEAT_TIMEOUT_SECONDS:-300}" \
     python "$ROOT/run_server.py"
   wait_http "http://127.0.0.1:$API_PORT/api/health" "$WAIT_API" "Flask 后端"
@@ -229,7 +230,7 @@ start_web() {
     # 直接调 node 执行，绕开 Windows 上传后 .bin/next 可执行位丢失的问题；
     # build 必须在 web_env 内运行，否则 node 不在 PATH；
     # max-old-space-size 限制 Node 堆上限（3G），配合 next.config 的 cpus:1
-    # 避免 AutoDL 实例内存不足被 OOM Killer 杀掉构建进程
+    # 避免服务器内存不足被 OOM Killer 杀掉构建进程
     ( source "$CONDA_SH" && conda activate "$WEB_ENV" && cd "$WEB_DIR" \
       && BACKEND_URL="$want" NODE_OPTIONS="--max-old-space-size=3072" node "$next_bin" build ) \
       || { err "前端构建失败，查看上方输出"; return 1; }
@@ -260,7 +261,7 @@ do_start() {
   echo
   do_status
   echo
-  ok "全部服务已处理完毕。AutoDL「自定义服务」入口固定 6006，浏览器应直接看到前端页面。"
+  ok "全部服务已处理完毕。反向代理入口固定 6006，浏览器应直接看到前端页面。"
   echo "   日志：tail -f $LOG_DIR/*.log"
   echo "   改库：./start_all.sh db query \"SELECT ...\" ｜ ./start_all.sh db exec \"UPDATE ...\""
 }

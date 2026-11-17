@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-训练脚本：Qwen2.5-7B-Instruct QLoRA 指令微调（单卡 AutoDL RTX4090D 24G）。
+训练脚本：Qwen2.5-7B-Instruct QLoRA 指令微调（单卡 RTX4090D 24G）。
 
 严格规范（与 config.py 一一对应）：
   - 4bit NF4 双重量化（QLoRA）+ bf16 混合精度

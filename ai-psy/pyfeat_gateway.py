@@ -52,7 +52,7 @@ SMILE_AU06_THRESHOLD = 0.2
 EXTRACT_FPS = int(os.environ.get("PYFEAT_EXTRACT_FPS", "2"))
 FRAME_EXTRACT_TIMEOUT_SECONDS = 120
 
-# 单次分析帧数上限：CPU 约 1.5~3.8s/帧，AutoDL 自定义服务反向代理约 60s 会掐断连接，
+# 单次分析帧数上限：CPU 约 1.5~3.8s/帧，反向代理约 60s 会掐断连接，
 # 10 帧（约 20~30s）最稳；抽帧超出该数时均匀降采样。
 MAX_ANALYZE_FRAMES = int(os.environ.get("PYFEAT_MAX_FRAMES", "10"))
 
@@ -82,6 +82,12 @@ def _monitor(msg: str) -> None:
 _DETECTOR = None
 _DETECTOR_LOCK = threading.Lock()
 _INFER_LOCK = threading.Lock()
+
+# 内部共享密钥：只允许 Flask 后端调用（配合回环绑定，防止同机其他进程/局域网直刷推理）
+GATEWAY_TOKEN = os.environ.get("PYFEAT_TOKEN", "xinqing-pyfeat-internal")
+# 抽帧在推理锁之外执行，不限并发会被大量请求拖垮 CPU，故独立限制同时抽帧数
+MAX_CONCURRENT_EXTRACT = int(os.environ.get("PYFEAT_EXTRACT_CONCURRENCY", "2"))
+_EXTRACT_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_EXTRACT)
 
 
 def _get_detector():
@@ -294,6 +300,8 @@ def health():
 @app.post("/analyze")
 def analyze():
     """分析上传的视频，返回 metrics；无人脸/解码失败返回 422。"""
+    if request.headers.get("X-Gateway-Token") != GATEWAY_TOKEN:
+        return jsonify({"error": "未授权访问"}), 401
     video = request.files.get("video")
     if video is None or not video.filename:
         return jsonify({"error": "未上传视频文件（字段名 video）"}), 400
@@ -308,16 +316,23 @@ def analyze():
     _t0 = time.time()
     try:
         video.save(video_path)
-        # ffmpeg 抽帧后逐帧检测：帧数只取决于时长，webm 元数据 bug 与长视频失控从源头消除
-        frame_dir, frame_paths = _extract_frames(video_path)
+        # 并发闸门：拿不到抽帧名额直接快速失败，避免请求堆积把 CPU/内存打满
+        if not _EXTRACT_SEMAPHORE.acquire(blocking=False):
+            _monitor("分析拒绝：抽帧并发已满，请稍后重试")
+            return jsonify({"error": "分析服务繁忙，请稍后重试"}), 503
+        try:
+            # ffmpeg 抽帧后逐帧检测：帧数只取决于时长，webm 元数据 bug 与长视频失控从源头消除
+            frame_dir, frame_paths = _extract_frames(video_path)
+        finally:
+            _EXTRACT_SEMAPHORE.release()
         if not frame_paths:
-            _monitor(f"分析失败：视频无有效帧 video={video.filename} "
+            _monitor(f"分析失败：视频无有效帧 "
                      f"size={os.path.getsize(video_path) / 1048576:.1f}MB 耗时={time.time() - _t0:.1f}s")
             return jsonify({"error": "视频无有效帧，请重新录制"}), 422
         selected = _select_frames(frame_paths)
         _monitor(
             f"抽帧={len(frame_paths)} 分析帧={len(selected)}（上限 {MAX_ANALYZE_FRAMES}） "
-            f"video={video.filename} size={os.path.getsize(video_path) / 1048576:.1f}MB"
+            f"size={os.path.getsize(video_path) / 1048576:.1f}MB"
         )
         with _INFER_LOCK:
             face_df = _detect_frames(_get_detector(), selected)
@@ -331,7 +346,8 @@ def analyze():
     except Exception as exc:
         _monitor(f"分析异常：{type(exc).__name__}: {exc}，耗时={time.time() - _t0:.1f}s")
         app.logger.exception("[pyfeat-gateway] 视频分析异常")
-        return jsonify({"error": f"py-feat 分析失败：{exc}"}), 500
+        # 异常细节只进日志，不回显给调用方（避免泄露内部路径/依赖信息）
+        return jsonify({"error": "py-feat 分析失败，请稍后重试"}), 500
     finally:
         try:
             os.remove(video_path)
@@ -349,5 +365,7 @@ def _cleanup():
 
 
 if __name__ == "__main__":
-    print(f"[pyfeat-gateway] 监听 0.0.0.0:{GATEWAY_PORT}", flush=True)
-    app.run(host="0.0.0.0", port=GATEWAY_PORT, threaded=True)
+    # 仅回环监听：网关是纯内网服务，不能暴露到局域网/公网
+    gw_host = os.environ.get("PYFEAT_HOST", "127.0.0.1")
+    print(f"[pyfeat-gateway] 监听 {gw_host}:{GATEWAY_PORT}", flush=True)
+    app.run(host=gw_host, port=GATEWAY_PORT, threaded=True)

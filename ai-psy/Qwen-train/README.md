@@ -1,6 +1,6 @@
 # Qwen2.5-7B-Instruct QLoRA 微调工程 · 统一说明文档
 
-单卡 AutoDL RTX4090D 24G：**bf16 原版基座 + 4bit NF4 量化 + bf16 混合精度**（标准 QLoRA，不依赖 autoawq）；
+单卡 RTX4090D 24G：**bf16 原版基座 + 4bit NF4 量化 + bf16 混合精度**（标准 QLoRA，不依赖 autoawq）；
 仅训练 `ai_chat` 通用聊天 LoRA 适配器（psych-chat，三人群对话样本合并），产物可被 vLLM `--enable-lora` 热挂载。
 
 ## 目录文件说明
@@ -44,7 +44,7 @@ export OMP_NUM_THREADS=8
 **基座模型（bf16 原版，约 16GB，必做）**：
 
 ```bash
-source /etc/network_turbo          # AutoDL 学术加速
+export HF_ENDPOINT=https://hf-mirror.com  # 国内网络镜像加速（config.py 亦默认设置）
 huggingface-cli download Qwen/Qwen2.5-7B-Instruct \
   --local-dir /root/autodl-tmp/Qwen2.5-7B-Instruct
 unset http_proxy https_proxy

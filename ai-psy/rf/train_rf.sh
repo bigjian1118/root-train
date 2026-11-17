@@ -18,7 +18,7 @@ cd "$SCRIPT_DIR/.."
 # ==================== 参数配置区（按需修改） ====================
 # --- 运行环境 ---
 CONDA_ENV="pyfeat_env"                                   # 后端同环境（CPU 即可）
-CONDA_PROFILE="/root/miniconda3/etc/profile.d/conda.sh"  # AutoDL 默认 conda 初始化路径
+CONDA_PROFILE="/root/miniconda3/etc/profile.d/conda.sh"  # 服务器默认 conda 初始化路径
 
 # --- 可调参数（train_*.py 实际读取的唯一入口：环境变量样本量） ---
 TEXT_SAMPLES=20000      # 文本任务合成答卷份数（RF_TEXT_SAMPLES，每因子各 TEXT_SAMPLES 行）
@@ -50,7 +50,7 @@ echo "[OK] conda 环境：$CONDA_ENV（$(python --version 2>&1)）"
 if ! python -c "import sklearn, joblib, numpy" 2>/dev/null; then
   echo "[提示] 检测到缺少训练依赖，自动补装：scikit-learn joblib numpy"
   pip install scikit-learn joblib numpy || {
-    echo "[错误] 依赖自动补装失败（多为网络问题），可先 source /etc/network_turbo 后重跑本脚本"
+    echo "[错误] 依赖自动补装失败（多为网络问题），可配置好 pip 镜像/网络后重跑本脚本"
     exit 1
   }
 fi
